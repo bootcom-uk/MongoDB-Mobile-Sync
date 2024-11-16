@@ -1,0 +1,44 @@
+name: Publish MongoDB.Sync nuget package
+
+on:
+  push:
+    branches: [ "main" ]
+    tags:
+      - 'publish-mongodb-sync-lib' 
+    
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    # Restore NuGet packages
+    - name: Restore dependencies
+      run: dotnet restore
+
+    # Build the project in Release mode
+    - name: Build solution
+      run: dotnet build --configuration Release
+
+    # Pack the NuGet package
+    - name: Pack NuGet package
+      run: dotnet pack --configuration Release --output ./output
+
+    # Upload NuGet package as an artifact
+    - name: Upload NuGet package artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: nuget-package
+        path: ./output/*.nupkg
+
+    # (Optional) Publish to NuGet
+    - name: Publish to NuGet
+      if: github.ref == 'refs/heads/main'  # Only publish on the main branch
+      run: dotnet nuget push "./output/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
