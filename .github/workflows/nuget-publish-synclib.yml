@@ -28,25 +28,30 @@ jobs:
 
     # Pack the specific project as a NuGet package
     - name: Pack NuGet package
-      run: dotnet pack Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release
+      run: dotnet pack Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release --output Common/MongoDB.Sync/bin/Release
 
     # Find the .nupkg file and store the path in a variable
     - name: Set NuGet package path
       id: set-path
       shell: pwsh
       run: |
-        $packagePath = Get-ChildItem -Path Common/MongoDB.Sync/bin/Release -Filter *.nupkg -Recurse | Select-Object -First 1 -ExpandProperty FullName
-        echo "Found package: $packagePath"
+        $files = Get-ChildItem -Path Common/MongoDB.Sync/bin/Release -Filter *.nupkg -Recurse
+        if ($files.Count -eq 0) {
+          Write-Error "No .nupkg files found in Common/MongoDB.Sync/bin/Release"
+          exit 1
+        }
+        $packagePath = $files[0].FullName
         echo "PACKAGE_PATH=$packagePath" >> $GITHUB_ENV
 
-    # Upload NuGet package as an artifact
-    - name: Upload NuGet package artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: nuget-package
-        path: Common/MongoDB.Sync/bin/Release/*.nupkg
+    # Debug PACKAGE_PATH
+    - name: Debug PACKAGE_PATH
+      run: echo "PACKAGE_PATH is $PACKAGE_PATH"
+      shell: pwsh
 
     # Publish to NuGet
     - name: Publish to NuGet
       if: github.ref == 'refs/heads/main'
-      run: dotnet nuget push "$PACKAGE_PATH" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+      run: |
+        echo "Pushing package from: $PACKAGE_PATH"
+        dotnet nuget push "$PACKAGE_PATH" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+      shell: pwsh
