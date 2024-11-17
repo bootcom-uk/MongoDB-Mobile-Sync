@@ -19,17 +19,17 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
-    # Restore NuGet packages
+      # Restore dependencies for the specific project
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore path/to/YourProject.csproj
 
-    # Build the project in Release mode
-    - name: Build solution
-      run: dotnet build --configuration Release
+    # Build the specific project in Release mode
+    - name: Build project
+      run: dotnet build MongoDB-Mobile-Sync/MongoDB-Mobile-Sync/Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release
 
-    # Pack the NuGet package
+    # Pack the specific project as a NuGet package
     - name: Pack NuGet package
-      run: dotnet pack --configuration Release --output ./output
+      run: dotnet pack MongoDB-Mobile-Sync/MongoDB-Mobile-Sync/Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release --output ./output
 
     # Upload NuGet package as an artifact
     - name: Upload NuGet package artifact
