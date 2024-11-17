@@ -46,13 +46,13 @@ jobs:
 
     # Debug PACKAGE_PATH
     - name: Debug PACKAGE_PATH
-      run: echo "PACKAGE_PATH is $PACKAGE_PATH"
+      run: echo "PACKAGE_PATH is ${{env.PACKAGE_PATH}}"
       shell: pwsh
 
     # Publish to NuGet
     - name: Publish to NuGet
       if: github.ref == 'refs/heads/main'
       run: |
-        echo "Pushing package from: $PACKAGE_PATH"
-        dotnet nuget push "$PACKAGE_PATH" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+        echo "Pushing package from: env.PACKAGE_PATH"
+        dotnet nuget push "${{env.PACKAGE_PATH}}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
       shell: pwsh
