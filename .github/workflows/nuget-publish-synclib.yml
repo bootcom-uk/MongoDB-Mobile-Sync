@@ -38,7 +38,10 @@ jobs:
     # Find the .nupkg file and store the path in a variable
     - name: Set NuGet package path
       id: set-path
-      run: echo "PACKAGE_PATH=$(dir /b Common/MongoDB.Sync/bin/Release/*.nupkg)" >> $GITHUB_ENV
+      shell: pwsh
+      run: |
+        $packagePath = Get-ChildItem -Path Common/MongoDB.Sync/bin/Release -Filter *.nupkg -Recurse | Select-Object -First 1 -ExpandProperty FullName
+        echo "PACKAGE_PATH=$packagePath" >> $GITHUB_ENV
 
     # Upload NuGet package as an artifact
     - name: Upload NuGet package artifact
