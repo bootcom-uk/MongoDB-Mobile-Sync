@@ -40,7 +40,7 @@ jobs:
 
     # Debugging step to list files
     - name: List contents of output directory
-      run: dir Common/MongoDB.Sync/output
+      run: dir Common/MongoDB.Sync/bin/Release
 
     # (Optional) Publish to NuGet
     - name: Publish to NuGet
