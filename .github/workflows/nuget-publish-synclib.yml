@@ -41,6 +41,7 @@ jobs:
           exit 1
         }
         $packagePath = $files[0].FullName
+        echo $packagePath
         echo "PACKAGE_PATH=$packagePath" >> $GITHUB_ENV
 
     # Debug PACKAGE_PATH
