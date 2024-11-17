@@ -36,6 +36,7 @@ jobs:
       shell: pwsh
       run: |
         $packagePath = Get-ChildItem -Path Common/MongoDB.Sync/bin/Release -Filter *.nupkg -Recurse | Select-Object -First 1 -ExpandProperty FullName
+        echo "Found package: $packagePath"
         echo "PACKAGE_PATH=$packagePath" >> $GITHUB_ENV
 
     # Upload NuGet package as an artifact
