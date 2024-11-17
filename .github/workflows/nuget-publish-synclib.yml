@@ -38,6 +38,10 @@ jobs:
         name: nuget-package
         path: Common/MongoDB.Sync/bin/Release/*.nupkg
 
+    # Debugging step to list files
+    - name: List contents of output directory
+      run: dir Common/MongoDB.Sync/output
+
     # (Optional) Publish to NuGet
     - name: Publish to NuGet
       if: github.ref == 'refs/heads/main'  # Only publish on the main branch
