@@ -45,4 +45,4 @@ jobs:
     # (Optional) Publish to NuGet
     - name: Publish to NuGet
       if: github.ref == 'refs/heads/main'  # Only publish on the main branch
-      run: dotnet nuget push "Common/MongoDB.Sync/bin/Release/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+      run: dotnet nuget push Common/MongoDB.Sync/bin/Release/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
