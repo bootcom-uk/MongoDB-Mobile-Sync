@@ -25,11 +25,11 @@ jobs:
 
     # Build the specific project in Release mode
     - name: Build project
-      run: dotnet build MongoDB-Mobile-Sync/MongoDB-Mobile-Sync/Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release
+      run: dotnet build Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release
 
     # Pack the specific project as a NuGet package
     - name: Pack NuGet package
-      run: dotnet pack MongoDB-Mobile-Sync/MongoDB-Mobile-Sync/Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release --output ./output
+      run: dotnet pack Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release --output ./output
 
     # Upload NuGet package as an artifact
     - name: Upload NuGet package artifact
