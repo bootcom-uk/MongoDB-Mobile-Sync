@@ -21,7 +21,7 @@ jobs:
 
       # Restore dependencies for the specific project
     - name: Restore dependencies
-      run: dotnet restore MongoDB-Mobile-Sync/MongoDB-Mobile-Sync/Common/MongoDB.Sync/MongoDB.Sync.csproj
+      run: dotnet restore Common/MongoDB.Sync/MongoDB.Sync.csproj
 
     # Build the specific project in Release mode
     - name: Build project
