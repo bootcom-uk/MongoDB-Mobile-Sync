@@ -41,8 +41,8 @@ jobs:
           exit 1
         }
         $packagePath = $files[0].FullName
-        echo $packagePath
-        echo "${{ steps.set-path.outputs.result }}"
+        echo "Package Path: ${{packagePath}}"
+        echo "${{ steps.set-path.packagePath }}"
 
 
     # Debug PACKAGE_PATH
