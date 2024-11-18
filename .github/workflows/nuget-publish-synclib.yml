@@ -42,12 +42,12 @@ jobs:
         }
         $packagePath = $files[0].FullName
         echo $packagePath
-        echo "PACKAGE_PATH=$packagePath" >> $GITHUB_ENV
+        echo "${{ steps.set-path.outputs.result }}"
 
 
     # Debug PACKAGE_PATH
     - name: Debug PACKAGE_PATH
-      run: echo "PACKAGE_PATH is ${{env.PACKAGE_PATH}}"
+      run: echo "PACKAGE_PATH is ${{ steps.set-path.outputs.result }}"
       shell: pwsh
 
     # Publish to NuGet
@@ -55,5 +55,5 @@ jobs:
       if: github.ref == 'refs/heads/main'
       run: |
         echo "Pushing package from: env.PACKAGE_PATH"
-        dotnet nuget push "${{env.PACKAGE_PATH}}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+        dotnet nuget push "${{ steps.set-path.outputs.result }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
       shell: pwsh
