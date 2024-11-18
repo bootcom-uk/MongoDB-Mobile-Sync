@@ -42,18 +42,19 @@ jobs:
         }
         $packagePath = $files[0].FullName
         $steps.set-path.outputs.result = $packagePath
-        echo "${{ steps.set-path.outputs.result }}"
+        echo "PackagePath=${{packagePath}}" | Out-File -FilePath $env:GITHUB_ENV -Append # no need for -Encoding utf8
+        echo "${{ env.PackagePath }}"
 
 
     # Debug PACKAGE_PATH
     - name: Debug PACKAGE_PATH
-      run: echo "PACKAGE_PATH is ${{ steps.set-path.outputs.result }}"
+      run: echo "PACKAGE_PATH is ${{ env.PackagePath }}"
       shell: pwsh
 
     # Publish to NuGet
     - name: Publish to NuGet
       if: github.ref == 'refs/heads/main'
       run: |
-        echo "Pushing package from: env.PACKAGE_PATH"
-        dotnet nuget push "${{ steps.set-path.outputs.result }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+        echo "Pushing package from: ${{ env.PackagePath }}"
+        dotnet nuget push "${{ env.PackagePath }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
       shell: pwsh
