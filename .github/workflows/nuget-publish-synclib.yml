@@ -41,8 +41,7 @@ jobs:
           exit 1
         }
         $packagePath = $files[0].FullName
-        $steps.set-path.outputs.result = $packagePath
-        echo "PackagePath=${{packagePath}}" | Out-File -FilePath $env:GITHUB_ENV -Append # no need for -Encoding utf8
+        echo "PackagePath=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Append # no need for -Encoding utf8
         echo "${{ env.PackagePath }}"
 
 
