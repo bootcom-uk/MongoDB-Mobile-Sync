@@ -12,6 +12,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Ensure the entire Git history is fetched
+
+    - name: Fetch full Git history (if needed)
+      run: git fetch --unshallow
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
