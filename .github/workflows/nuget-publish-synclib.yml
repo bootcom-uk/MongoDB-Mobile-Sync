@@ -16,12 +16,13 @@ jobs:
         fetch-depth: 0  # Ensure the entire Git history is fetched
 
     - name: Verify Git History
+      shell: pwsh
       run: |
-        if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+        if ((git rev-parse --is-shallow-repository) -eq $true) {
           git fetch --unshallow
-        else
-          echo "Repository is already fully cloned."
-        fi
+        } else {
+          Write-Host "Repository is already fully cloned."
+        }
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
