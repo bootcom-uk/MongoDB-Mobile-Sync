@@ -29,7 +29,7 @@ jobs:
 
     - name: Generate Version
       id: gitversion
-      run: gitversion /output json
+      run: dotnet-gitversion /output json
 
     # Build the specific project in Release mode
     - name: Build project
