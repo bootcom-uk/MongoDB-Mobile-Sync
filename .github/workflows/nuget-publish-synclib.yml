@@ -1,8 +1,7 @@
-name: Publish MongoDB.Sync nuget package
+name: Publish MongoDB.Sync NuGet package
 
 on:
   push:
-    branches: [ "main" ]
     tags:
       - 'publish-mongodb-sync-lib'
 
@@ -33,14 +32,17 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore Common/MongoDB.Sync/MongoDB.Sync.csproj
 
+    # Install GitVersion
     - name: Install GitVersion
       uses: gittools/actions/gitversion/setup@v0.10.0
       with:
         versionSpec: '5.x'
 
+    # Generate version using GitVersion
     - name: Generate Version
       id: gitversion
-      run: dotnet-gitversion /output json
+      run: gitversion /output json /showvariable SemVer
+      shell: pwsh
 
     # Build the specific project in Release mode
     - name: Build project
@@ -55,15 +57,14 @@ jobs:
       id: set-path
       shell: pwsh
       run: |
-        $files = Get-ChildItem -Path Common/MongoDB.Sync/bin/Release -Filter *.nupkg -Recurse
+        $files = Get-ChildItem -Path "Common/MongoDB.Sync/bin/Release" -Filter *.nupkg -Recurse
         if ($files.Count -eq 0) {
           Write-Error "No .nupkg files found in Common/MongoDB.Sync/bin/Release"
           exit 1
         }
         $packagePath = $files[0].FullName
-        echo "PackagePath=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Append # no need for -Encoding utf8
-        echo "${{ env.PackagePath }}"
-
+        Write-Host "Found package at $packagePath"
+        echo "PackagePath=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Append
 
     # Debug PACKAGE_PATH
     - name: Debug PACKAGE_PATH
@@ -72,8 +73,6 @@ jobs:
 
     # Publish to NuGet
     - name: Publish to NuGet
-      if: github.ref == 'refs/heads/main'
-      run: |
-        echo "Pushing package from: ${{ env.PackagePath }}"
-        dotnet nuget push "${{ env.PackagePath }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+      if: always()
+      run: dotnet nuget push "${{ env.PackagePath }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
       shell: pwsh
