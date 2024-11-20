@@ -41,7 +41,7 @@ jobs:
     # Generate version using GitVersion
     - name: Generate Version
       id: gitversion
-      run: gitversion /output json /showvariable SemVer
+      run: dotnet-gitversion /output json /showvariable SemVer
       shell: pwsh
 
     # Build the specific project in Release mode
