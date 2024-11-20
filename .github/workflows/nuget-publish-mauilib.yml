@@ -3,7 +3,7 @@ name: Publish MongoDB.Sync NuGet package
 on:
   push:
     tags:
-      - 'publish-mongodb-maui-lib'
+      - 'publish-mongodb-maui-lib*'
 
 jobs:
   build:
