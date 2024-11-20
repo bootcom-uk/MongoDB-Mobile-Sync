@@ -37,11 +37,14 @@ jobs:
       with:
         versionSpec: '5.x'
 
-    # Generate version information
+    # Generate version information and export to environment variable
     - name: Generate Version
       id: gitversion
-      run: dotnet-gitversion /output json /showvariable SemVer
       shell: pwsh
+      run: |
+        $version = dotnet-gitversion /output json /showvariable SemVer
+        echo "Generated version: $version"
+        echo "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
     # Restore dependencies
     - name: Restore dependencies
@@ -54,7 +57,7 @@ jobs:
     # Package the NuGet package with the version
     - name: Pack NuGet Package
       run: |
-        dotnet pack Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release --output Common/MongoDB.Sync/bin/Release /p:PackageVersion=${{ steps.gitversion.outputs.SemVer }}
+        dotnet pack Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release --output Common/MongoDB.Sync/bin/Release /p:PackageVersion=${{ env.PACKAGE_VERSION }}
 
     # Locate the .nupkg file
     - name: Locate Package
@@ -69,6 +72,13 @@ jobs:
         $packagePath = $files[0].FullName
         Write-Host "Found package at $packagePath"
         echo "PACKAGE_PATH=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+    # Debug PACKAGE_VERSION and PACKAGE_PATH
+    - name: Debug PACKAGE_VERSION and PACKAGE_PATH
+      run: |
+        echo "PACKAGE_VERSION is ${{ env.PACKAGE_VERSION }}"
+        echo "PACKAGE_PATH is ${{ env.PACKAGE_PATH }}"
+      shell: pwsh
 
     # Publish the NuGet package
     - name: Publish NuGet Package
