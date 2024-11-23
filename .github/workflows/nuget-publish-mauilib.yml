@@ -9,6 +9,10 @@ jobs:
   build:
     runs-on: windows-latest
 
+    permissions:
+      contents: read
+      secrets: write
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -32,18 +36,10 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore Common/MongoDB.Sync.MAUI/MongoDB.Sync.MAUI.csproj
 
-    # Install GitVersion
-    - name: Install GitVersion
-      uses: gittools/actions/gitversion/setup@v0.10.0
-      with:
-        versionSpec: '5.x'
-
     # Retrieve the current version from GitHub secrets
     - name: Get Current Version
       id: get-version
-      run: |
-        CURRENT_VERSION=${{ secrets.MAUI_LIB_CURRENT_VERSION }}
-        echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
+      run: echo "CURRENT_VERSION=${{ secrets.MAUI_LIB_CURRENT_VERSION }}" >> $GITHUB_ENV
 
     # Increment the patch version (e.g., 1.0.0 -> 1.0.1)
     - name: Increment Version
@@ -61,7 +57,7 @@ jobs:
 
     # Pack the specific project as a NuGet package
     - name: Pack NuGet package
-      run: dotnet pack Common/MongoDB.Sync/MongoDB.Sync.MAUI.csproj --configuration Release --output Common/MongoDB.Sync.MAUI/bin/Release /p:PackageVersion=${{ env.NEW_VERSION }}
+      run: dotnet pack Common/MongoDB.Sync.MAUI/MongoDB.Sync.MAUI.csproj --configuration Release --output Common/MongoDB.Sync.MAUI/bin/Release /p:PackageVersion=${{ env.NEW_VERSION }}
 
     # Find the .nupkg file and store the path in a variable
     - name: Set NuGet package path
@@ -75,7 +71,7 @@ jobs:
         }
         $packagePath = $files[0].FullName
         Write-Host "Found package at $packagePath"
-        echo "PackagePath=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "PackagePath=$packagePath" >> $GITHUB_ENV
 
     # Debug PACKAGE_PATH
     - name: Debug PACKAGE_PATH
@@ -87,3 +83,10 @@ jobs:
       if: always()
       run: dotnet nuget push "${{ env.PackagePath }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
       shell: pwsh
+
+    # Update GitHub Secret with the new version
+    - name: Update Current Version Secret
+      uses: peter-evans/create-or-update-secret@v3
+      with:
+        secret: MAUI_LIB_CURRENT_VERSION
+        encrypted_value: ${{ env.NEW_VERSION }}
