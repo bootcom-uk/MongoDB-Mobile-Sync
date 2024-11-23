@@ -38,11 +38,22 @@ jobs:
       with:
         versionSpec: '5.x'
 
-    # Generate version using GitVersion
-    - name: Generate Version
-      id: gitversion
-      run: dotnet-gitversion /output json /showvariable SemVer
-      shell: pwsh
+    # Retrieve the current version from GitHub secrets
+    - name: Get Current Version
+      id: get-version
+      run: |
+        MAUI_LIB_CURRENT_VERSION=${{ secrets.MAUI_LIB_CURRENT_VERSION }}
+        echo "MAUI_LIB_CURRENT_VERSION=$MAUI_LIB_CURRENT_VERSION" >> $GITHUB_ENV
+
+    # Increment the patch version (e.g., 1.0.0 -> 1.0.1)
+    - name: Increment Version
+      id: increment-version
+      run: |
+        IFS='.' read -r MAJOR MINOR PATCH <<< "${{ env.MAUI_LIB_CURRENT_VERSION }}"
+        PATCH=$((PATCH + 1))
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+        echo "Incremented version to $NEW_VERSION"
 
     # Build the specific project in Release mode
     - name: Build project
@@ -50,7 +61,7 @@ jobs:
 
     # Pack the specific project as a NuGet package
     - name: Pack NuGet package
-      run: dotnet pack Common/MongoDB.Sync/MongoDB.Sync.MAUI.csproj --configuration Release --output Common/MongoDB.Sync.MAUI/bin/Release /p:PackageVersion=${{ steps.gitversion.outputs.SemVer }}
+      run: dotnet pack Common/MongoDB.Sync/MongoDB.Sync.MAUI.csproj --configuration Release --output Common/MongoDB.Sync.MAUI/bin/Release /p:PackageVersion=${{ env.NEW_VERSION }}
 
     # Find the .nupkg file and store the path in a variable
     - name: Set NuGet package path
