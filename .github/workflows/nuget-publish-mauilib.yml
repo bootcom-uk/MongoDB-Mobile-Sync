@@ -1,4 +1,4 @@
-name: Publish MongoDB.Sync NuGet package
+name: Publish MongoDB.Sync.MAUI NuGet Package
 
 on:
   push:
