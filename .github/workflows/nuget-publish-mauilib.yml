@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  secrets: write  # Ensure this is at the top level
+
 jobs:
   build:
     runs-on: windows-latest
@@ -82,7 +85,7 @@ jobs:
 
     # Update GitHub Secret with the new version
     - name: Update Current Version Secret
-      uses: peter-evans/create-or-update-secret@v3
+      uses: peter-evans/create-or-update-secret@v2
       with:
         secret: MAUI_LIB_CURRENT_VERSION
         encrypted_value: ${{ env.NEW_VERSION }}
