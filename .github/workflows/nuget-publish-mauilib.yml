@@ -2,8 +2,8 @@ name: Publish MongoDB.Sync.MAUI NuGet Package
 
 on:
   push:
-    tags:
-      - 'publish-mongodb-maui-lib'
+    branches:
+      - main
 
 jobs:
   build:
