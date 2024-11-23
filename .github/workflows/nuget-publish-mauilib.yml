@@ -42,14 +42,14 @@ jobs:
     - name: Get Current Version
       id: get-version
       run: |
-        MAUI_LIB_CURRENT_VERSION=${{ secrets.MAUI_LIB_CURRENT_VERSION }}
-        echo "MAUI_LIB_CURRENT_VERSION=$MAUI_LIB_CURRENT_VERSION" >> $GITHUB_ENV
+        CURRENT_VERSION=${{ secrets.MAUI_LIB_CURRENT_VERSION }}
+        echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
 
     # Increment the patch version (e.g., 1.0.0 -> 1.0.1)
     - name: Increment Version
       id: increment-version
       run: |
-        IFS='.' read -r MAJOR MINOR PATCH <<< "${{ env.MAUI_LIB_CURRENT_VERSION }}"
+        IFS='.' read -r MAJOR MINOR PATCH <<< "${{ env.CURRENT_VERSION }}"
         PATCH=$((PATCH + 1))
         NEW_VERSION="$MAJOR.$MINOR.$PATCH"
         echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
