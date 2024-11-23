@@ -6,8 +6,8 @@ on:
       - main
 
 permissions:
-  contents: write  # Required to publish changes
-  actions: write   # Required for managing secrets if needed
+  contents: write  # Required to interact with the repository
+  actions: write   # Required for workflow execution
 
 jobs:
   build:
@@ -18,30 +18,22 @@ jobs:
       with:
         fetch-depth: 0  # Ensure the entire Git history is fetched
 
-    - name: Verify Git History
-      shell: pwsh
-      run: |
-        if ((git rev-parse --is-shallow-repository) -eq $true) {
-          git fetch --unshallow
-        } else {
-          Write-Host "Repository is already fully cloned."
-        }
-
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
 
-    # Restore dependencies for the specific project
-    - name: Restore dependencies
-      run: dotnet restore Common/MongoDB.Sync.MAUI/MongoDB.Sync.MAUI.csproj
+    - name: Install GitHub CLI
+      run: choco install gh -y
 
-    # Retrieve the current version from GitHub secrets
+    - name: Authenticate GitHub CLI
+      run: gh auth login --with-token <<< "${{ secrets.GH_TOKEN }}"
+
     - name: Get Current Version
       id: get-version
-      run: echo "CURRENT_VERSION=${{ secrets.MAUI_LIB_CURRENT_VERSION }}" >> $GITHUB_ENV
+      run: |
+        echo "CURRENT_VERSION=${{ secrets.MAUI_LIB_CURRENT_VERSION }}" >> $GITHUB_ENV
 
-    # Increment the patch version (e.g., 1.0.0 -> 1.0.1)
     - name: Increment Version
       id: increment-version
       run: |
@@ -49,17 +41,13 @@ jobs:
         PATCH=$((PATCH + 1))
         NEW_VERSION="$MAJOR.$MINOR.$PATCH"
         echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-        echo "Incremented version to $NEW_VERSION"
 
-    # Build the specific project in Release mode
     - name: Build project
       run: dotnet build Common/MongoDB.Sync.MAUI/MongoDB.Sync.MAUI.csproj --configuration Release
 
-    # Pack the specific project as a NuGet package
     - name: Pack NuGet package
       run: dotnet pack Common/MongoDB.Sync.MAUI/MongoDB.Sync.MAUI.csproj --configuration Release --output Common/MongoDB.Sync.MAUI/bin/Release /p:PackageVersion=${{ env.NEW_VERSION }}
 
-    # Find the .nupkg file and store the path in a variable
     - name: Set NuGet package path
       id: set-path
       shell: pwsh
@@ -70,23 +58,10 @@ jobs:
           exit 1
         }
         $packagePath = $files[0].FullName
-        Write-Host "Found package at $packagePath"
         echo "PackagePath=$packagePath" >> $GITHUB_ENV
 
-    # Debug PACKAGE_PATH
-    - name: Debug PACKAGE_PATH
-      run: echo "PACKAGE_PATH is ${{ env.PackagePath }}"
-      shell: pwsh
-
-    # Publish to NuGet
     - name: Publish to NuGet
-      if: always()
       run: dotnet nuget push "${{ env.PackagePath }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
-      shell: pwsh
 
-    # Update GitHub Secret with the new version
-    - name: Update Current Version Secret
-      uses: peter-evans/create-or-update-secret@v2
-      with:
-        secret: MAUI_LIB_CURRENT_VERSION
-        encrypted_value: ${{ env.NEW_VERSION }}
+    - name: Update GitHub Secret with New Version
+      run: gh secret set MAUI_LIB_CURRENT_VERSION --body "${{ env.NEW_VERSION }}"
