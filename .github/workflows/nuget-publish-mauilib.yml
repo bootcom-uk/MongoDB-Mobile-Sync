@@ -6,7 +6,8 @@ on:
       - main
 
 permissions:
-  secrets: write  # Ensure this is at the top level
+  contents: write  # Required to publish changes
+  actions: write   # Required for managing secrets if needed
 
 jobs:
   build:
