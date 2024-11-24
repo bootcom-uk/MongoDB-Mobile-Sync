@@ -63,12 +63,13 @@ jobs:
       run: |
         $files = Get-ChildItem -Path "Common/MongoDB.Sync.MAUI/bin/Release" -Filter *.nupkg -Recurse
         if ($files.Count -eq 0) {
-          Write-Error "No .nupkg files found in Common/MongoDB.Sync.MAUI/bin/Release"
-          exit 1
+          throw "No .nupkg files found in Common/MongoDB.Sync.MAUI/bin/Release"
         }
         $packagePath = $files[0].FullName
-        echo "PACKAGEPATH=$packagePath" >> $GITHUB_ENV
-        Write-Host "Found package at ${{env.PACKAGEPATH}}"
+        Write-Host "Found package at $packagePath"
+        "$PACKAGEPATH" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        Write-Host "PACKAGEPATH=$packagePath" # For debugging purposes
+
         
 
     - name: Publish to NuGet
