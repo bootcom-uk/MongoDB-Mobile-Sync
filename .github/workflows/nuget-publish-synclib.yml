@@ -49,7 +49,7 @@ jobs:
         git config --global user.email "actions@github.com"
         git add sync_version.txt
         git commit -m "Increment version to ${{ env.NEW_VERSION }}"
-        git push
+        git push --force
 
     - name: Build project
       run: dotnet build Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release
