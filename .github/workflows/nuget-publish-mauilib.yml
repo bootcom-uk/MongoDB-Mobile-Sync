@@ -67,8 +67,9 @@ jobs:
           exit 1
         }
         $packagePath = $files[0].FullName
-        Write-Host "Found package at $packagePath"
-        echo "PackagePath=$packagePath" >> $GITHUB_ENV
+        echo "PACKAGEPATH=$packagePath" >> $GITHUB_ENV
+        Write-Host "Found package at ${{env.PACKAGEPATH}}"
+        
 
     - name: Publish to NuGet
-      run: dotnet nuget push "${{ env.PackagePath }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+      run: dotnet nuget push "${{env.PACKAGEPATH}}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
