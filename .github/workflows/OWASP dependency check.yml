@@ -1,0 +1,30 @@
+name: OWASP Dependency Security Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  dependency-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Run OWASP Dependency-Check
+      uses: jeremylong/gh-dependency-check@v4
+      with:
+        format: "ALL"
+        output-directory: "dependency-check-report"
+        scan: "."
+        fail-on-cvss: "7"
