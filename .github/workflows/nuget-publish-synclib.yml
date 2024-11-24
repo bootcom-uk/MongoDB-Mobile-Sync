@@ -1,9 +1,10 @@
 name: Publish MongoDB.Sync NuGet Package
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["SonarQube Cloud"]
+    types:
+      - completed
 
 permissions:
   contents: write  # Allow writing to the repository
