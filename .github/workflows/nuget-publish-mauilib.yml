@@ -1,9 +1,12 @@
-name: Publish MongoDB.Sync NuGet package
+name: Publish MongoDB.Sync.MAUI NuGet Package
 
 on:
   push:
-    tags:
-      - 'publish-mongodb-maui-lib*'
+    branches:
+      - main
+
+permissions:
+  contents: write  # Allow writing to the repository
 
 jobs:
   build:
@@ -14,45 +17,45 @@ jobs:
       with:
         fetch-depth: 0  # Ensure the entire Git history is fetched
 
-    - name: Verify Git History
-      shell: pwsh
-      run: |
-        if ((git rev-parse --is-shallow-repository) -eq $true) {
-          git fetch --unshallow
-        } else {
-          Write-Host "Repository is already fully cloned."
-        }
-
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
 
-    # Restore dependencies for the specific project
-    - name: Restore dependencies
-      run: dotnet restore Common/MongoDB.Sync.MAUI/MongoDB.Sync.MAUI.csproj
+    - name: Get Current Version from File
+      id: get-version
+      shell: bash
+      run: |
+        if [ ! -f version.txt ]; then
+        echo "1.0.0" > version.txt
+        fi
+        CURRENT_VERSION=$(cat version.txt)
+        echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
 
-    # Install GitVersion
-    - name: Install GitVersion
-      uses: gittools/actions/gitversion/setup@v0.10.0
-      with:
-        versionSpec: '5.x'
+    - name: Increment Version
+      id: increment-version
+      shell: bash
+      run: |
+        IFS='.' read -r MAJOR MINOR PATCH <<< "${{ env.CURRENT_VERSION }}"
+        PATCH=$((PATCH + 1))
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        echo "$NEW_VERSION" > ./version.txt  # Specify the file path explicitly
+        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-    # Generate version using GitVersion
-    - name: Generate Version
-      id: gitversion
-      run: dotnet-gitversion /output json /showvariable SemVer
-      shell: pwsh
+    - name: Commit Updated Version
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add version.txt
+        git commit -m "Increment version to ${{ env.NEW_VERSION }}"
+        git push
 
-    # Build the specific project in Release mode
     - name: Build project
       run: dotnet build Common/MongoDB.Sync.MAUI/MongoDB.Sync.MAUI.csproj --configuration Release
 
-    # Pack the specific project as a NuGet package
     - name: Pack NuGet package
-      run: dotnet pack Common/MongoDB.Sync/MongoDB.Sync.MAUI.csproj --configuration Release --output Common/MongoDB.Sync.MAUI/bin/Release /p:PackageVersion=${{ steps.gitversion.outputs.SemVer }}
+      run: dotnet pack Common/MongoDB.Sync.MAUI/MongoDB.Sync.MAUI.csproj --configuration Release --output Common/MongoDB.Sync.MAUI/bin/Release /p:PackageVersion=${{ env.NEW_VERSION }}
 
-    # Find the .nupkg file and store the path in a variable
     - name: Set NuGet package path
       id: set-path
       shell: pwsh
@@ -63,16 +66,7 @@ jobs:
           exit 1
         }
         $packagePath = $files[0].FullName
-        Write-Host "Found package at $packagePath"
-        echo "PackagePath=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "PackagePath=$packagePath" >> $GITHUB_ENV
 
-    # Debug PACKAGE_PATH
-    - name: Debug PACKAGE_PATH
-      run: echo "PACKAGE_PATH is ${{ env.PackagePath }}"
-      shell: pwsh
-
-    # Publish to NuGet
     - name: Publish to NuGet
-      if: always()
       run: dotnet nuget push "${{ env.PackagePath }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
-      shell: pwsh

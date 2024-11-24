@@ -1,19 +1,21 @@
-name: Publish MongoDB.Sync NuGet package
+name: Publish MongoDB.Sync NuGet Package
 
 on:
   push:
-    tags:
-      - 'publish-mongodb-sync-lib*'
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
+    # Check out the code
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Ensure the entire Git history is fetched
+        fetch-depth: 0  # Fetch the entire history for versioning
 
+    # Ensure the repository is fully cloned
     - name: Verify Git History
       shell: pwsh
       run: |
@@ -23,14 +25,11 @@ jobs:
           Write-Host "Repository is already fully cloned."
         }
 
+    # Set up .NET environment
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-
-    # Restore dependencies for the specific project
-    - name: Restore dependencies
-      run: dotnet restore Common/MongoDB.Sync/MongoDB.Sync.csproj
 
     # Install GitVersion
     - name: Install GitVersion
@@ -38,23 +37,31 @@ jobs:
       with:
         versionSpec: '5.x'
 
-    # Generate version using GitVersion
+    # Generate version information and export to environment variable
     - name: Generate Version
       id: gitversion
-      run: dotnet-gitversion /output json /showvariable SemVer
       shell: pwsh
+      run: |
+        $version = dotnet-gitversion /output json /showvariable SemVer
+        echo "Generated version: $version"
+        echo "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-    # Build the specific project in Release mode
-    - name: Build project
+    # Restore dependencies
+    - name: Restore dependencies
+      run: dotnet restore Common/MongoDB.Sync/MongoDB.Sync.csproj
+
+    # Build the project
+    - name: Build Project
       run: dotnet build Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release
 
-    # Pack the specific project as a NuGet package
-    - name: Pack NuGet package
-      run: dotnet pack Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release --output Common/MongoDB.Sync/bin/Release /p:PackageVersion=${{ steps.gitversion.outputs.SemVer }}
+    # Package the NuGet package with the version
+    - name: Pack NuGet Package
+      run: |
+        dotnet pack Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release --output Common/MongoDB.Sync/bin/Release /p:PackageVersion=${{ env.PACKAGE_VERSION }}
 
-    # Find the .nupkg file and store the path in a variable
-    - name: Set NuGet package path
-      id: set-path
+    # Locate the .nupkg file
+    - name: Locate Package
+      id: locate-package
       shell: pwsh
       run: |
         $files = Get-ChildItem -Path "Common/MongoDB.Sync/bin/Release" -Filter *.nupkg -Recurse
@@ -64,15 +71,17 @@ jobs:
         }
         $packagePath = $files[0].FullName
         Write-Host "Found package at $packagePath"
-        echo "PackagePath=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "PACKAGE_PATH=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-    # Debug PACKAGE_PATH
-    - name: Debug PACKAGE_PATH
-      run: echo "PACKAGE_PATH is ${{ env.PackagePath }}"
+    # Debug PACKAGE_VERSION and PACKAGE_PATH
+    - name: Debug PACKAGE_VERSION and PACKAGE_PATH
+      run: |
+        echo "PACKAGE_VERSION is ${{ env.PACKAGE_VERSION }}"
+        echo "PACKAGE_PATH is ${{ env.PACKAGE_PATH }}"
       shell: pwsh
 
-    # Publish to NuGet
-    - name: Publish to NuGet
-      if: always()
-      run: dotnet nuget push "${{ env.PackagePath }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+    # Publish the NuGet package
+    - name: Publish NuGet Package
+      run: |
+        dotnet nuget push "${{ env.PACKAGE_PATH }}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
       shell: pwsh
