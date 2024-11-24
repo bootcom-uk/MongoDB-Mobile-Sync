@@ -57,8 +57,7 @@ jobs:
     - name: Pack NuGet package
       run: dotnet pack Common/MongoDB.Sync.MAUI/MongoDB.Sync.MAUI.csproj --configuration Release --output Common/MongoDB.Sync.MAUI/bin/Release /p:PackageVersion=${{ env.NEW_VERSION }}
 
-    - name: Set NuGet package path
-      id: set-path
+    - name: Publish to NuGet
       shell: pwsh
       run: |
         $files = Get-ChildItem -Path "Common/MongoDB.Sync.MAUI/bin/Release" -Filter *.nupkg -Recurse
@@ -66,11 +65,4 @@ jobs:
           throw "No .nupkg files found in Common/MongoDB.Sync.MAUI/bin/Release"
         }
         $packagePath = $files[0].FullName
-        Write-Host "Found package at $packagePath"
-        "$PACKAGEPATH" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-        Write-Host "PACKAGEPATH=$packagePath" # For debugging purposes
-
-        
-
-    - name: Publish to NuGet
-      run: dotnet nuget push "${{env.PACKAGEPATH}}" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+        dotnet nuget push "$packagePath" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
