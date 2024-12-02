@@ -54,8 +54,7 @@ namespace MongoDB.Sync.MAUI.Extensions
                 syncHttpService.RefreshToken = options.RefreshToken;
                 return syncHttpService;
             });
-
-            // Register ISyncService with SyncService as its implementation
+            
             services.AddSingleton<ISyncService>(provider =>
             {
                 var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
