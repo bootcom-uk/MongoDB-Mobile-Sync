@@ -2,8 +2,6 @@
 using CommunityToolkit.Mvvm.Messaging;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using System.Text.Json;
 
 namespace MongoDB.Sync.Services
 {

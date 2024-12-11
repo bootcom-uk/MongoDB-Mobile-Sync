@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDB.Sync.MAUI", "Common
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDBSyncDemo", "MongoDBSyncDemo\MongoDBSyncDemo.csproj", "{88510287-C91E-4F13-A3D3-03CE18842101}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDB.Sync.Web", "Common\MongoDB.Sync.Web\MongoDB.Sync.Web.csproj", "{E0385A7C-9CCA-4756-B86D-27DDF5C3327A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -49,6 +51,10 @@ Global
 		{88510287-C91E-4F13-A3D3-03CE18842101}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{88510287-C91E-4F13-A3D3-03CE18842101}.Release|Any CPU.Build.0 = Release|Any CPU
 		{88510287-C91E-4F13-A3D3-03CE18842101}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{E0385A7C-9CCA-4756-B86D-27DDF5C3327A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E0385A7C-9CCA-4756-B86D-27DDF5C3327A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E0385A7C-9CCA-4756-B86D-27DDF5C3327A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E0385A7C-9CCA-4756-B86D-27DDF5C3327A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -59,6 +65,7 @@ Global
 		{E042A608-CDC4-4815-A6A2-DD188749295B} = {53E7D53A-5A80-4332-B779-AF35CB4FA2E3}
 		{2C0C3C0B-CE73-4C63-BFB6-375F954FBF04} = {53E7D53A-5A80-4332-B779-AF35CB4FA2E3}
 		{88510287-C91E-4F13-A3D3-03CE18842101} = {DDEED3D5-091D-4F82-9112-311CCE79D8C4}
+		{E0385A7C-9CCA-4756-B86D-27DDF5C3327A} = {53E7D53A-5A80-4332-B779-AF35CB4FA2E3}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7693B48E-79E1-4A24-8223-1BCE3C72D5FE}
