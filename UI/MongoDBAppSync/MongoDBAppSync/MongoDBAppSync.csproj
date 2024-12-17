@@ -48,12 +48,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Prism.DryIoc.Maui" Version="9.0.537" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="Microsoft.Maui.Controls" Version="8.0.92" />
+    <PackageReference Update="Microsoft.Maui.Controls" Version="9.0.21" />
   </ItemGroup>
 
   <ItemGroup>
