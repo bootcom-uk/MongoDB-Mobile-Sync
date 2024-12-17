@@ -27,7 +27,7 @@ jobs:
       id: get-version
       shell: bash
       run: |
-        if [ ! -f maui_version.txt ]; then
+        if [ ! -f web_version.txt ]; then
         echo "1.0.0" > web_version.txt
         fi
         CURRENT_VERSION=$(cat web_version.txt)
