@@ -23,8 +23,8 @@ jobs:
       with:
         dotnet-version: 9.0.x
 
-    - name: Get Current Version from File
-      id: get-version
+    - name: Get Current Sync Version from File
+      id: get-sync-version
       shell: bash
       run: |
         if [ ! -f sync_version.txt ]; then
@@ -33,37 +33,73 @@ jobs:
         CURRENT_VERSION=$(cat sync_version.txt)
         echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
 
-
-    - name: Increment Version
-      id: increment-version
+    - name: Get Current Web Version from File
+      id: get-web-version
       shell: bash
       run: |
-        IFS='.' read -r MAJOR MINOR PATCH <<< "${{ env.CURRENT_VERSION }}"
+        if [ ! -f web_version.txt ]; then
+        echo "1.0.0" > web_version.txt
+        fi
+        CURRENT_VERSION=$(cat web_version.txt)
+        echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
+
+    - name: Increment Sync Version
+      id: increment-sync-version
+      shell: bash
+      run: |
+        IFS='.' read -r MAJOR MINOR PATCH <<< "${{ env.CURRENT_SYNC_VERSION }}"
         PATCH=$((PATCH + 1))
         NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-        echo "$NEW_VERSION" > ./sync_version.txt  # Specify the file path explicitly
-        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+        echo "$NEW_SYNC_VERSION" > ./sync_version.txt  # Specify the file path explicitly
+        echo "NEW_SYNC_VERSION=$NEW_SYNC_VERSION" >> $GITHUB_ENV
+
+    - name: Increment Web Version
+      id: increment-web-version
+      shell: bash
+      run: |
+        IFS='.' read -r MAJOR MINOR PATCH <<< "${{ env.CURRENT_WEB_VERSION }}"
+        PATCH=$((PATCH + 1))
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        echo "$NEW_WEB_VERSION" > ./web_version.txt  # Specify the file path explicitly
+        echo "NEW_WEB_VERSION=$NEW_WEB_VERSION" >> $GITHUB_ENV
 
     - name: Commit Updated Version
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         git add sync_version.txt
-        git commit -m "Increment version to ${{ env.NEW_VERSION }}"
+        git add web_version.txt
+        git commit -m "Increment version to ${{ env.NEW_SYNC_VERSION }}"
         git push --force
 
-    - name: Build project
+    - name: Build sync project
       run: dotnet build Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release
 
-    - name: Pack NuGet package
-      run: dotnet pack Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release --output Common/MongoDB.Sync/bin/Release /p:PackageVersion=${{ env.NEW_VERSION }}
+    - name: Build web project
+      run: dotnet build Common/MongoDB.Sync/MongoDB.Sync.Web.csproj --configuration Release
 
-    - name: Publish to NuGet
+    - name: Pack sync NuGet package
+      run: dotnet pack Common/MongoDB.Sync/MongoDB.Sync.csproj --configuration Release --output Common/MongoDB.Sync/bin/Release /p:PackageVersion=${{ env.NEW_SYNC_VERSION }}
+
+    - name: Pack web NuGet package
+      run: dotnet pack Common/MongoDB.Sync.Web/MongoDB.Sync.Web.csproj --configuration Release --output Common/MongoDB.Sync.Web/bin/Release /p:PackageVersion=${{ env.NEW_WEB_VERSION }}
+
+    - name: Publish sync to NuGet
       shell: pwsh
       run: |
         $files = Get-ChildItem -Path "Common/MongoDB.Sync/bin/Release" -Filter *.nupkg -Recurse
         if ($files.Count -eq 0) {
           throw "No .nupkg files found in Common/MongoDB.Sync/bin/Release"
+        }
+        $packagePath = $files[0].FullName
+        dotnet nuget push "$packagePath" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+
+    - name: Publish web to NuGet
+      shell: pwsh
+      run: |
+        $files = Get-ChildItem -Path "Common/MongoDB.Sync.Web/bin/Release" -Filter *.nupkg -Recurse
+        if ($files.Count -eq 0) {
+          throw "No .nupkg files found in Common/MongoDB.Sync.Web/bin/Release"
         }
         $packagePath = $files[0].FullName
         dotnet nuget push "$packagePath" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
