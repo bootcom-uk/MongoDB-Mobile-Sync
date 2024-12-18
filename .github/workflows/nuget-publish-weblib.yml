@@ -2,7 +2,7 @@ name: Publish MongoDB.Sync.Web NuGet Package
 
 on:
   workflow_run:
-    workflows: ["Publish MongoDB.Sync NuGet Package"]
+    workflows: ["Publish MongoDB.Sync.MAUI NuGet Package"]
     types:
       - completed
 
