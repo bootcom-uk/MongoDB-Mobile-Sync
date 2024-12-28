@@ -49,7 +49,7 @@ jobs:
       run: |
         IFS='.' read -r MAJOR MINOR PATCH <<< "${{ env.CURRENT_SYNC_VERSION }}"
         PATCH=$((PATCH + 1))
-        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        $NEW_SYNC_VERSION="$MAJOR.$MINOR.$PATCH"
         echo "$NEW_SYNC_VERSION" > ./sync_version.txt  # Specify the file path explicitly
         echo "NEW_SYNC_VERSION=$NEW_SYNC_VERSION" >> $GITHUB_ENV
 
@@ -59,7 +59,7 @@ jobs:
       run: |
         IFS='.' read -r MAJOR MINOR PATCH <<< "${{ env.CURRENT_WEB_VERSION }}"
         PATCH=$((PATCH + 1))
-        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        $NEW_WEB_VERSION="$MAJOR.$MINOR.$PATCH"
         echo "$NEW_WEB_VERSION" > ./web_version.txt  # Specify the file path explicitly
         echo "NEW_WEB_VERSION=$NEW_WEB_VERSION" >> $GITHUB_ENV
 
