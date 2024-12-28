@@ -30,8 +30,8 @@ jobs:
         if [ ! -f sync_version.txt ]; then
         echo "1.0.0" > sync_version.txt
         fi
-        CURRENT_VERSION=$(cat sync_version.txt)
-        echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
+        CURRENT_SYNC_VERSION=$(cat sync_version.txt)
+        echo "CURRENT_SYNC_VERSION=$CURRENT_SYNC_VERSION" >> $GITHUB_ENV
 
     - name: Get Current Web Version from File
       id: get-web-version
@@ -40,8 +40,8 @@ jobs:
         if [ ! -f web_version.txt ]; then
         echo "1.0.0" > web_version.txt
         fi
-        CURRENT_VERSION=$(cat web_version.txt)
-        echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
+        CURRENT_WEB_VERSION=$(cat web_version.txt)
+        echo "CURRENT_WEB_VERSION=$CURRENT_WEB_VERSION" >> $GITHUB_ENV
 
     - name: Increment Sync Version
       id: increment-sync-version
