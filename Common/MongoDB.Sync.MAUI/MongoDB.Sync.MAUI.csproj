@@ -29,4 +29,8 @@
 	  <ProjectReference Include="..\MongoDB.Sync\MongoDB.Sync.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Interfaces\" />
+	</ItemGroup>
+
 </Project>

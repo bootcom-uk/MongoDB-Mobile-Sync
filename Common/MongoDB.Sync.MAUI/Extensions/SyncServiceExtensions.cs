@@ -10,18 +10,18 @@ namespace MongoDB.Sync.MAUI.Extensions
     public static class SyncServiceExtensions
     {
 
-        public static IServiceCollection SetupSyncService(
-        this IServiceCollection services,
+        public static MauiAppBuilder SetupSyncService(
+        this MauiAppBuilder builder,
         Action<SyncOptions> syncOptionsAction, Action<HttpSyncOptions> httpSyncOptionsAction)
         {
             // Configure SyncOptions and add HttpClientFactory
-            services.Configure(syncOptionsAction);
-            services.Configure(httpSyncOptionsAction);
-            services.AddHttpClient();
+            builder.Services.Configure(syncOptionsAction);
+            builder.Services.Configure(httpSyncOptionsAction);
+            builder.Services.AddHttpClient();
 
 
             // Register SyncOptions as a singleton service
-            services.AddSingleton(provider =>
+            builder.Services.AddSingleton(provider =>
             {
                 var options = new SyncOptions();
                 syncOptionsAction(options);
@@ -29,7 +29,7 @@ namespace MongoDB.Sync.MAUI.Extensions
             });
 
             // Register the local database service
-            services.AddSingleton<LocalDatabaseService>(provider =>
+            builder.Services.AddSingleton<LocalDatabaseService>(provider =>
             {
                 var options = provider.GetRequiredService<SyncOptions>();
                 var messenger = provider.GetRequiredService<IMessenger>();
@@ -37,14 +37,14 @@ namespace MongoDB.Sync.MAUI.Extensions
             });
 
             // Now include the instance of the http sync service (and options)
-            services.AddSingleton(provider =>
+            builder.Services.AddSingleton(provider =>
             {
                 var options = new HttpSyncOptions();
                 httpSyncOptionsAction(options);
                 return options;
             });
 
-            services.AddSingleton<SyncHttpService>(provider =>
+            builder.Services.AddSingleton<SyncHttpService>(provider =>
             {
                 var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
                 var options = provider.GetRequiredService<HttpSyncOptions>();
@@ -55,7 +55,7 @@ namespace MongoDB.Sync.MAUI.Extensions
                 return syncHttpService;
             });
             
-            services.AddSingleton<ISyncService>(provider =>
+            builder.Services.AddSingleton<ISyncService>(provider =>
             {
                 var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
                 var options = provider.GetRequiredService<SyncOptions>();
@@ -63,7 +63,7 @@ namespace MongoDB.Sync.MAUI.Extensions
                 return new SyncService(provider.GetRequiredService<LocalDatabaseService>(), provider.GetRequiredService<SyncHttpService>(), messenger, options.ApiUrl, options.AppName);
             });
 
-            return services;
+            return builder;
         }
 
     }
