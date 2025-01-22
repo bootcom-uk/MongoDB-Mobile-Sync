@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.Mvvm.Messaging.Messages;
+using MongoDB.Sync.Exceptions;
 using MongoDB.Sync.Messages;
 using Newtonsoft.Json.Linq;
 using System;
@@ -67,7 +68,7 @@ namespace MongoDB.Sync.Services
             // Throw an exception if the response message is null
             if (httpResponseMessage is null)
             {
-                throw new Exception("The web request did not return a result");
+                throw new WebRequestNotCompletedException("The web request did not return a result");
             }
 
             // Successful response
