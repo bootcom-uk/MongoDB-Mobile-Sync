@@ -1,8 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
-using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Sync.Interfaces;
 using MongoDB.Sync.MAUI.Models;
 using MongoDB.Sync.Services;
+using Microsoft.Extensions.Http.Resilience;
+using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http;
 
 namespace MongoDB.Sync.MAUI.Extensions
@@ -17,7 +19,18 @@ namespace MongoDB.Sync.MAUI.Extensions
             // Configure SyncOptions and add HttpClientFactory
             builder.Services.Configure(syncOptionsAction);
             builder.Services.Configure(httpSyncOptionsAction);
-            builder.Services.AddHttpClient();
+            builder.Services.AddHttpClient("BootComHttpClient", client =>
+            {
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                client.DefaultRequestHeaders.AcceptEncoding.Clear();
+                client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
+            })
+                .ConfigurePrimaryHttpMessageHandler(() =>
+                new HttpClientHandler
+                {
+                    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+                })
+                .AddStandardResilienceHandler();
 
 
             // Register SyncOptions as a singleton service
