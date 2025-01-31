@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using MongoDB.Sync.Interfaces;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
+using Services;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace MongoDB.Sync.Services
@@ -20,61 +21,25 @@ namespace MongoDB.Sync.Services
         private readonly string _appName;
         private HubConnection? _hubConnection;
         
-        private readonly SyncHttpService _syncHttpService;
+        private readonly HttpService _httpService;
 
         private readonly IMessenger _messenger;
+
+        private Func<Task> _statusCheckAction;
 
         public readonly LocalDatabaseService _localDatabaseService;
 
         public event EventHandler<UpdatedData>? OnDataUpdated;
 
-        public event EventHandler<string>? OnAuthorizationRequested;
-
-        public event EventHandler OnAuthorizationFailed;
-
-        public SyncService(LocalDatabaseService localDatabaseService, SyncHttpService syncHttpService, IMessenger messenger, string apiUrl, string appName)
+        public SyncService(LocalDatabaseService localDatabaseService, HttpService httpService, IMessenger messenger, string apiUrl, string appName)
         {
             _apiUrl = apiUrl;
             _appName = appName;
-            _syncHttpService = syncHttpService;
+            _httpService = httpService;
             _messenger = messenger;
             _localDatabaseService = localDatabaseService;
         }
 
-        // Initial data sync from the API
-        private async Task FetchDataAsync(DateTime? lastSyncDate, string? lastSyncedId = null)
-        {
-
-            var httpRequestMessage = new HttpRequestMessage()
-            {
-                Method = HttpMethod.Post,
-                RequestUri = new Uri($"{_apiUrl}/sync")
-            };
-
-            var formContent = new MultipartFormDataContent();
-            formContent.Add(new StringContent(_appName, Encoding.UTF8, MediaTypeNames.Text.Plain), "appName");
-            if(lastSyncDate != null) formContent.Add(new StringContent(lastSyncDate.Value.ToString(), Encoding.UTF8, MediaTypeNames.Text.Plain), "lastSyncDate");
-            if(lastSyncedId != null) formContent.Add(new StringContent(lastSyncedId, Encoding.UTF8, MediaTypeNames.Text.Plain), "lastSyncedId");
-            httpRequestMessage.Content = formContent;
-
-            var response = await _syncHttpService.MakeRequest<SyncResult>(httpRequestMessage);
-            if (response != null && response.Success)
-            {
-
-                foreach (var item in response.Data)
-                {
-                    _messenger.Send<RealtimeUpdateReceivedMessage>(new RealtimeUpdateReceivedMessage(new UpdatedData
-                    {
-                        CollectionName = response.CollectionName!,
-                        Database = response.DatabaseName!,
-                        Document = item,
-                        Id = null,
-                        UpdatedAt = null
-                    }));
-                }
-                    
-            }
-        }
 
         private void HandleRealtimeUpdate(string jsonData)
         {
@@ -105,26 +70,25 @@ namespace MongoDB.Sync.Services
 
                 while (dataSyncResult == null || (dataSyncResult != null && dataSyncResult.Data!.Count > 0))
                 {
-                    var httpRequestMessage = new HttpRequestMessage()
+
+                    var builder = _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/sync"), HttpMethod.Post);
+                    var formContent = new Dictionary<string, string>()
                     {
-                        Method = HttpMethod.Post,
-                        RequestUri = new Uri($"{_apiUrl}/api/DataSync/sync")
+                        { "AppName", _appName },
+                        { "DatabaseName", item.DatabaseName },
+                        { "CollectionName", item.CollectionName },
+                        { "PageNumber", pageNumber.ToString() }
                     };
+                    if (lastSyncedId != null) formContent.Add("LastSyncedId", lastSyncedId!.ToString());
+                    var response = await builder.WithFormContent(formContent)
+                                                .OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction)
+                                                .SendAsync< SyncResult>();
 
-                    var formContent = new MultipartFormDataContent();
-                    formContent.Add(new StringContent(_appName, Encoding.UTF8, MediaTypeNames.Text.Plain), "AppName");
-                    formContent.Add(new StringContent(item.DatabaseName, Encoding.UTF8, MediaTypeNames.Text.Plain), "DatabaseName");
-                    formContent.Add(new StringContent(item.CollectionName, Encoding.UTF8, MediaTypeNames.Text.Plain), "CollectionName");
-                    formContent.Add(new StringContent(pageNumber.ToString(), Encoding.UTF8, MediaTypeNames.Text.Plain), "PageNumber");
-                    // if (lastSyncDate != null) formContent.Add(new StringContent(lastSyncDate.Value.ToString(), Encoding.UTF8, MediaTypeNames.Text.Plain), "LastSyncDate");
-                     if (lastSyncedId != null) formContent.Add(new StringContent(lastSyncedId!.ToString(), Encoding.UTF8, MediaTypeNames.Text.Plain), "LastSyncedId");
-                    httpRequestMessage.Content = formContent;
+                     
 
-                    dataSyncResult = await _syncHttpService.MakeRequest<SyncResult>(httpRequestMessage);
+                    if (response is null || !response.Success) break;
 
-                    if (dataSyncResult is null) break;
-
-                    foreach(var rawDoc in dataSyncResult.Data)
+                    foreach(var rawDoc in response.Result!.Data)
                     {
                         _messenger.Send<RealtimeUpdateReceivedMessage>(new RealtimeUpdateReceivedMessage(new UpdatedData()
                         {
@@ -142,10 +106,12 @@ namespace MongoDB.Sync.Services
 
         }
 
-        public async Task StartSyncAsync()
+        public async Task StartSyncAsync(Func<Task>? statusChangeAction)
         {
 
             if (_syncHasStarted || _syncIsStarting) return;
+
+            if(statusChangeAction != null) _statusCheckAction = statusChangeAction;
 
             _syncIsStarting = true;
 
@@ -192,7 +158,7 @@ namespace MongoDB.Sync.Services
 
         public async Task ResumeSyncAsync()
         {
-            await StartSyncAsync();
+            await StartSyncAsync(null);
         }
 
         public async Task ClearCacheAsync()
@@ -212,16 +178,17 @@ namespace MongoDB.Sync.Services
         /// <returns></returns>
         private async Task<AppSyncMapping?> GetAppInformation()
         {
-            var httpRequestMessage = new HttpRequestMessage();
 
-            httpRequestMessage.RequestUri = new Uri($"{_apiUrl}/api/DataSync/Collect");
-            httpRequestMessage.Method = HttpMethod.Post;
-            var formContent = new MultipartFormDataContent();
-            formContent.Add(new StringContent(_appName, Encoding.UTF8, MediaTypeNames.Text.Plain), "AppName");
-            httpRequestMessage.Content = formContent;
-            var httpResponse = await _syncHttpService.MakeRequest<AppSyncMapping>(httpRequestMessage);
+            var response = await _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/Collect"), HttpMethod.Post)
+                .WithFormContent(new()
+                {
+                    { "AppName", _appName }
+                })
+                .SendAsync<AppSyncMapping>();
 
-            return httpResponse;
+            if (response is null) throw new NullReferenceException("The request failed and returned no response");
+
+            return response.Result;
 
         }
 

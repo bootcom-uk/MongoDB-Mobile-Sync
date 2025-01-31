@@ -6,6 +6,7 @@ using Microsoft.Extensions.Http.Resilience;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http;
+using Services;
 
 namespace MongoDB.Sync.MAUI.Extensions
 {
@@ -14,11 +15,11 @@ namespace MongoDB.Sync.MAUI.Extensions
 
         public static MauiAppBuilder SetupSyncService(
         this MauiAppBuilder builder,
-        Action<SyncOptions> syncOptionsAction, Action<HttpSyncOptions> httpSyncOptionsAction)
+        Action<SyncOptions> syncOptionsAction, Func<Task> onStatusAction)
         {
             // Configure SyncOptions and add HttpClientFactory
+            builder.Services.AddSingleton<HttpRequestBuilder>();
             builder.Services.Configure(syncOptionsAction);
-            builder.Services.Configure(httpSyncOptionsAction);
             builder.Services.AddHttpClient("BootComHttpClient", client =>
             {
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -49,22 +50,11 @@ namespace MongoDB.Sync.MAUI.Extensions
                 return new LocalDatabaseService(messenger, options.LiteDbPath);
             });
 
-            // Now include the instance of the http sync service (and options)
-            builder.Services.AddSingleton(provider =>
-            {
-                var options = new HttpSyncOptions();
-                httpSyncOptionsAction(options);
-                return options;
-            });
 
-            builder.Services.AddSingleton<SyncHttpService>(provider =>
+            builder.Services.AddSingleton<HttpService>(provider =>
             {
                 var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
-                var options = provider.GetRequiredService<HttpSyncOptions>();
-                var syncHttpService = new SyncHttpService(httpClientFactory.CreateClient(Guid.NewGuid().ToString()), provider.GetRequiredService<IMessenger>());
-                syncHttpService.DeviceId = options.DeviceId;
-                syncHttpService.JwtToken = options.UserToken;
-                syncHttpService.RefreshToken = options.RefreshToken;
+                var syncHttpService = new HttpService(httpClientFactory);
                 return syncHttpService;
             });
             
@@ -73,7 +63,7 @@ namespace MongoDB.Sync.MAUI.Extensions
                 var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
                 var options = provider.GetRequiredService<SyncOptions>();
                 var messenger = provider.GetRequiredService<IMessenger>();
-                return new SyncService(provider.GetRequiredService<LocalDatabaseService>(), provider.GetRequiredService<SyncHttpService>(), messenger, options.ApiUrl, options.AppName);
+                return new SyncService(provider.GetRequiredService<LocalDatabaseService>(), provider.GetRequiredService<HttpService>(), messenger, options.ApiUrl, options.AppName);
             });
 
             return builder;
