@@ -15,7 +15,7 @@ namespace MongoDB.Sync.MAUI.Extensions
 
         public static MauiAppBuilder SetupSyncService(
         this MauiAppBuilder builder,
-        Action<SyncOptions> syncOptionsAction, Func<Task> onStatusAction)
+        Action<SyncOptions> syncOptionsAction)
         {
             // Configure SyncOptions and add HttpClientFactory
             builder.Services.AddSingleton<HttpRequestBuilder>();
