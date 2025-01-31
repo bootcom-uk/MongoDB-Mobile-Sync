@@ -17,22 +17,11 @@ namespace MongoDB.Sync.MAUI.Extensions
         this MauiAppBuilder builder,
         Action<SyncOptions> syncOptionsAction)
         {
+
             // Configure SyncOptions and add HttpClientFactory
+            builder.Services.AddSingleton<IHttpClientFactory>();
             builder.Services.Configure(syncOptionsAction);
-            builder.Services.AddHttpClient("BootComHttpClient", client =>
-            {
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                client.DefaultRequestHeaders.AcceptEncoding.Clear();
-                client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
-            })
-                .ConfigurePrimaryHttpMessageHandler(() =>
-                new HttpClientHandler
-                {
-                    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
-                })
-                .AddStandardResilienceHandler();
-
-
+            
             // Register SyncOptions as a singleton service
             builder.Services.AddSingleton(provider =>
             {
