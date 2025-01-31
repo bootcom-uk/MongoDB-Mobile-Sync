@@ -18,7 +18,6 @@ namespace MongoDB.Sync.MAUI.Extensions
         Action<SyncOptions> syncOptionsAction)
         {
             // Configure SyncOptions and add HttpClientFactory
-            builder.Services.AddSingleton<HttpRequestBuilder>();
             builder.Services.Configure(syncOptionsAction);
             builder.Services.AddHttpClient("BootComHttpClient", client =>
             {
