@@ -51,12 +51,7 @@ namespace MongoDB.Sync.MAUI.Extensions
             });
 
 
-            builder.Services.AddSingleton<HttpService>(provider =>
-            {
-                var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
-                var syncHttpService = new HttpService(httpClientFactory);
-                return syncHttpService;
-            });
+            builder.Services.AddSingleton<HttpService>();
             
             builder.Services.AddSingleton<ISyncService>(provider =>
             {
