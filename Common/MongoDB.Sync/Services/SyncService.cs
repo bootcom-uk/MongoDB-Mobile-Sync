@@ -82,7 +82,8 @@ namespace MongoDB.Sync.Services
                     if (lastSyncedId != null) formContent.Add("LastSyncedId", lastSyncedId!.ToString());
                     var response = await builder.WithFormContent(formContent)
                                                 .OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction)
-                                                .SendAsync< SyncResult>();
+                                                .WithRetry(3)
+                                                .SendAsync<SyncResult>();
 
                      
 
@@ -184,6 +185,8 @@ namespace MongoDB.Sync.Services
                 {
                     { "AppName", _appName }
                 })
+                .OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction)
+                .WithRetry(3)
                 .SendAsync<AppSyncMapping>();
 
             if (response is null) throw new NullReferenceException("The request failed and returned no response");
