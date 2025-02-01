@@ -25,7 +25,7 @@ namespace MongoDB.Sync.Services
 
         private readonly IMessenger _messenger;
 
-        private Func<Task> _statusCheckAction;
+        private Func<HttpRequestMessage, Task> _statusCheckAction;
 
         public readonly LocalDatabaseService _localDatabaseService;
 
@@ -106,7 +106,7 @@ namespace MongoDB.Sync.Services
 
         }
 
-        public async Task StartSyncAsync(Func<Task>? statusChangeAction)
+        public async Task StartSyncAsync(Func<HttpRequestMessage, Task>? statusChangeAction)
         {
 
             if (_syncHasStarted || _syncIsStarting) return;
