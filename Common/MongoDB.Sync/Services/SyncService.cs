@@ -139,6 +139,8 @@ namespace MongoDB.Sync.Services
                 await _hubConnection.StartAsync();
             }
 
+            await _hubConnection.InvokeAsync("SubscribeToApp", _appName);
+
             _messenger.Send<InitializeLocalDataMappingMessage>(new InitializeLocalDataMappingMessage(_appDetails));
 
             await PerformAPISync();
