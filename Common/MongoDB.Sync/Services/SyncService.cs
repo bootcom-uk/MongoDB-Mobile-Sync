@@ -89,7 +89,9 @@ namespace MongoDB.Sync.Services
 
                     if (response is null || !response.Success) break;
 
-                    foreach(var rawDoc in response.Result!.Data)
+                    dataSyncResult = response.Result;
+
+                    foreach (var rawDoc in response.Result!.Data)
                     {
                         _messenger.Send<RealtimeUpdateReceivedMessage>(new RealtimeUpdateReceivedMessage(new UpdatedData()
                         {
