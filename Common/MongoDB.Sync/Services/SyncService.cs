@@ -177,7 +177,7 @@ namespace MongoDB.Sync.Services
         /// Collect the information about all collections in our app database
         /// </summary>
         /// <returns></returns>
-        private async Task<AppSyncMapping?> GetAppInformation()
+        public async Task<AppSyncMapping?> GetAppInformation()
         {
 
             var response = await _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/Collect"), HttpMethod.Post)
