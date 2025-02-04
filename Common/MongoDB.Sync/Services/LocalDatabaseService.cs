@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.Messaging;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
+using System.Collections;
 
 namespace MongoDB.Sync.Services
 {
@@ -76,6 +77,12 @@ namespace MongoDB.Sync.Services
 
         }
 
+        public DateTime? GetLastSyncDateTime(string databaseName, string collectionName)
+        {
+            var collection = _liteDb.GetCollection($"{databaseName}_{collectionName}");
+            return collection.Max(x => x["__meta.dateUpdated"]).AsDateTime;
+        }
+
         public ObjectId? GetLastId(string databaseName, string collectionName)
         {
             var appsCollection = _liteDb.GetCollection<AppSyncMapping>("AppMappings");
@@ -83,6 +90,14 @@ namespace MongoDB.Sync.Services
             var collectionToModify = appRecord.Collections.FirstOrDefault(record => record.DatabaseName == databaseName && record.CollectionName == collectionName);
             if (collectionToModify == null) return null;
             return collectionToModify.LastId;
+        }
+
+        public void InitialSyncComplete()
+        {
+            var appsCollection = _liteDb.GetCollection<AppSyncMapping>("AppMappings");
+            var appRecord = appsCollection.FindOne(x => x.AppName == _appName);
+            appRecord.InitialSyncComplete = true;
+            appsCollection.Update(appRecord);
         }
 
         private void SetLastId(string databaseName, string collectionName, ObjectId id)
