@@ -61,13 +61,13 @@ namespace MongoDB.Sync.Services
 
         private async Task PerformAPISync()
         {
+
             // Loop through each collection stored
             foreach (var item in _appDetails!.Collections) {
 
                 var dataSyncResult = (null as SyncResult);
                 var pageNumber = 1;
-                var lastSyncedId = _localDatabaseService.GetLastId(item.DatabaseName, item.CollectionName);
-
+                
                 while (dataSyncResult == null || (dataSyncResult != null && dataSyncResult.Data!.Count > 0))
                 {
 
@@ -79,7 +79,17 @@ namespace MongoDB.Sync.Services
                         { "CollectionName", item.CollectionName },
                         { "PageNumber", pageNumber.ToString() }
                     };
-                    if (lastSyncedId != null) formContent.Add("LastSyncedId", lastSyncedId!.ToString());
+
+                    if(_appDetails.InitialSyncComplete)
+                    {
+                        var lastSyncDate = _localDatabaseService.GetLastSyncDateTime(item.DatabaseName, item.CollectionName);
+                        if (lastSyncDate != null) formContent.Add("LastSyncDate", lastSyncDate!.ToString());
+                    } else
+                    {
+                        var lastSyncedId = _localDatabaseService.GetLastId(item.DatabaseName, item.CollectionName);
+                        if (lastSyncedId != null) formContent.Add("LastSyncedId", lastSyncedId!.ToString());
+                    }
+
                     var response = await builder.WithFormContent(formContent)
                                                 .OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction)
                                                 .WithRetry(3)
@@ -106,6 +116,8 @@ namespace MongoDB.Sync.Services
                 }
 
             }
+
+            _localDatabaseService.InitialSyncComplete();
 
         }
 

@@ -25,5 +25,8 @@ namespace MongoDB.Sync.Models
 
         [ObservableProperty]
         string appName;
+
+        [ObservableProperty]
+        bool initialSyncComplete;
     }
 }
