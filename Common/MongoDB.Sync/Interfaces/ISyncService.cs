@@ -8,7 +8,7 @@ namespace MongoDB.Sync.Interfaces
         event EventHandler<UpdatedData>? OnDataUpdated;
 
         // Starts the synchronization process, optionally from a specific point in time or ID
-        Task StartSyncAsync(Func<HttpRequestMessage, Task> statusChangeAction);
+        Task StartSyncAsync(Func<HttpRequestMessage, Task> preRequestAction, Func<HttpRequestMessage, Task> statusChangeAction);
 
         // Stops the synchronization process, including disconnecting from SignalR
         Task StopSyncAsync();

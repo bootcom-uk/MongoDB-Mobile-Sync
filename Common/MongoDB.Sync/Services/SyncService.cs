@@ -25,7 +25,9 @@ namespace MongoDB.Sync.Services
 
         private readonly IMessenger _messenger;
 
-        private Func<HttpRequestMessage, Task> _statusCheckAction;
+        private Func<HttpRequestMessage, Task>? _statusCheckAction;
+
+        private Func<HttpRequestMessage, Task>? _preRequestAction;
 
         public readonly LocalDatabaseService _localDatabaseService;
 
@@ -90,12 +92,15 @@ namespace MongoDB.Sync.Services
                         if (lastSyncedId != null) formContent.Add("LastSyncedId", lastSyncedId!.ToString());
                     }
 
-                    var response = await builder.WithFormContent(formContent)
-                                                .OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction)
-                                                .WithRetry(3)
-                                                .SendAsync<SyncResult>();
+                    builder.WithFormContent(formContent);
 
-                     
+                    if(_preRequestAction != null) builder.PreRequest(_preRequestAction);
+
+                    var response = await builder
+                        .OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction)
+                        .WithRetry(3)
+                        .SendAsync<SyncResult>();
+
 
                     if (response is null || !response.Success) break;
 
@@ -121,12 +126,13 @@ namespace MongoDB.Sync.Services
 
         }
 
-        public async Task StartSyncAsync(Func<HttpRequestMessage, Task>? statusChangeAction)
+        public async Task StartSyncAsync(Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction)
         {
 
             if (_syncHasStarted || _syncIsStarting) return;
 
             if(statusChangeAction != null) _statusCheckAction = statusChangeAction;
+            if (preRequestAction != null) _preRequestAction = preRequestAction;
 
             _syncIsStarting = true;
 
@@ -175,7 +181,7 @@ namespace MongoDB.Sync.Services
 
         public async Task ResumeSyncAsync()
         {
-            await StartSyncAsync(null);
+            await StartSyncAsync(null, _statusCheckAction);
         }
 
         public async Task ClearCacheAsync()
@@ -196,7 +202,10 @@ namespace MongoDB.Sync.Services
         public async Task<AppSyncMapping?> GetAppInformation()
         {
 
-            var response = await _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/Collect"), HttpMethod.Post)
+            var builder = _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/Collect"), HttpMethod.Post);
+            if (_preRequestAction != null) builder.PreRequest(_preRequestAction);
+
+            var response = await builder
                 .WithFormContent(new()
                 {
                     { "AppName", _appName }
