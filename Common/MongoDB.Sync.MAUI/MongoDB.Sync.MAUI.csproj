@@ -20,7 +20,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.5" />
+		<PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.7" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.1.0" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.30" />
