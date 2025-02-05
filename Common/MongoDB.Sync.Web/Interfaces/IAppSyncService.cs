@@ -8,11 +8,11 @@ namespace MongoDB.Sync.Web.Interfaces
 
         Task<SyncResult> SyncAppDataAsync(string appName,
     string userId,
-    DateTime? lastSyncDate,
     string databaseName,
     string collectionName,
     int pageNumber = 1,
-    string? lastSyncedId = null);
+    string? lastSyncedId = null,
+    DateTime? lastSyncDate = null);
 
         Task<AppSyncMapping?> GetAppInformation(string appName);
     }

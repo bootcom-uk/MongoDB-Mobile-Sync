@@ -45,11 +45,11 @@ namespace MongoDB.Sync.Web.Services
         public async Task<SyncResult> SyncAppDataAsync(
     string appName,
     string userId,
-    DateTime? lastSyncDate,
     string databaseName,
     string collectionName,
     int pageNumber = 1,
-    string? lastSyncedId = null)
+    string? lastSyncedId = null,
+    DateTime? lastSyncDate = null)
         {
             var appCollection = _appServicesDb.GetCollection<AppSyncMapping>("SyncMappings");
             var appMapping = await appCollection.Find(a => a.AppName == appName).FirstOrDefaultAsync();

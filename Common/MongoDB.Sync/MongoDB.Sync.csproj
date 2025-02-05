@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.2" />
+    <PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.5" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="LiteDB" Version="5.0.21" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
