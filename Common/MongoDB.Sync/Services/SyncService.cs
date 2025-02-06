@@ -72,6 +72,7 @@ namespace MongoDB.Sync.Services
                 
                 while (dataSyncResult == null || (dataSyncResult != null && dataSyncResult.Data!.Count > 0))
                 {
+                    Console.WriteLine($"Syncing {item.DatabaseName}.{item.CollectionName} Page {pageNumber}");
 
                     var builder = _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/sync"), HttpMethod.Post);
                     var formContent = new Dictionary<string, string>()
@@ -82,10 +83,13 @@ namespace MongoDB.Sync.Services
                         { "PageNumber", pageNumber.ToString() }
                     };
 
-                    if(_appDetails.InitialSyncComplete)
-                    {
+                    
+
+                    if (_appDetails.InitialSyncComplete)
+                    {                        
                         var lastSyncDate = _localDatabaseService.GetLastSyncDateTime(item.DatabaseName, item.CollectionName);
-                        if (lastSyncDate != null) formContent.Add("LastSyncDate", lastSyncDate!.ToString());
+                        Console.WriteLine($"Checking last sync date time for database: {item.DatabaseName} collection: {item.CollectionName}. Last date is: {lastSyncDate}");
+                        if (lastSyncDate != null) formContent.Add("LastSyncDate", $"{lastSyncDate}");
                     } else
                     {
                         var lastSyncedId = _localDatabaseService.GetLastId(item.DatabaseName, item.CollectionName);
