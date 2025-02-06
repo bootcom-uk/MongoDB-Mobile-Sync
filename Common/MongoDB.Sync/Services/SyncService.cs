@@ -64,7 +64,7 @@ namespace MongoDB.Sync.Services
         private async Task PerformAPISync()
         {
 
-            _appDetails = _localDatabaseService.GetAppMapping(_appName);
+            _appDetails = _localDatabaseService.GetAppMapping();
 
             // Loop through each collection stored
             foreach (var item in _appDetails!.Collections) {
