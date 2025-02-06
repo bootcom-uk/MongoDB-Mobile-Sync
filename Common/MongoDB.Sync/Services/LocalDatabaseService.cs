@@ -38,10 +38,10 @@ namespace MongoDB.Sync.Services
             }
         }
 
-        public AppSyncMapping GetAppMapping(string appName)
+        public AppSyncMapping GetAppMapping()
         {
             var appsCollection = _liteDb.GetCollection<AppSyncMapping>("AppMappings");
-            return appsCollection.FindOne(x => x.AppName == appName);
+            return appsCollection.FindOne(x => x.AppName == _appName);
         }
 
         private void HandleLocalDataMappings(object recipient, InitializeLocalDataMappingMessage message)
