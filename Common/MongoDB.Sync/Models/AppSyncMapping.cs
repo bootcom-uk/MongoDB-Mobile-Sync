@@ -12,7 +12,7 @@ namespace MongoDB.Sync.Models
     {
 
         [ObservableProperty]
-        ObjectId id;
+        ObjectId id = ObjectId.Empty;
 
         [ObservableProperty]
         int version;
@@ -21,10 +21,10 @@ namespace MongoDB.Sync.Models
         int fullRefreshIfNoActivityInDays;
 
         [ObservableProperty]
-        List<CollectionMapping> collections;
+        List<CollectionMapping> collections = new();
 
         [ObservableProperty]
-        string appName;
+        string appName = string.Empty;
 
         [ObservableProperty]
         bool initialSyncComplete;

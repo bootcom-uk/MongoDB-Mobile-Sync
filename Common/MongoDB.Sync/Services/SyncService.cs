@@ -64,6 +64,8 @@ namespace MongoDB.Sync.Services
         private async Task PerformAPISync()
         {
 
+            _appDetails = _localDatabaseService.GetAppMapping(_appName);
+
             // Loop through each collection stored
             foreach (var item in _appDetails!.Collections) {
 
@@ -100,8 +102,9 @@ namespace MongoDB.Sync.Services
 
                     if(_preRequestAction != null) builder.PreRequest(_preRequestAction);
 
-                    var response = await builder
-                        .OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction)
+                    if(_statusCheckAction != null) builder.OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction);
+
+                    var response = await builder                        
                         .WithRetry(3)
                         .SendAsync<SyncResult>();
 
@@ -209,12 +212,13 @@ namespace MongoDB.Sync.Services
             var builder = _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/Collect"), HttpMethod.Post);
             if (_preRequestAction != null) builder.PreRequest(_preRequestAction);
 
+            if (_statusCheckAction != null) builder.OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction);
+
             var response = await builder
                 .WithFormContent(new()
                 {
                     { "AppName", _appName }
-                })
-                .OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction)
+                })                
                 .WithRetry(3)
                 .SendAsync<AppSyncMapping>();
 
