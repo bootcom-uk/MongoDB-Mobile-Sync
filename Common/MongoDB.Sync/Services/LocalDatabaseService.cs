@@ -13,7 +13,7 @@ namespace MongoDB.Sync.Services
 
         private readonly LiteDatabase _liteDb;
 
-        private string _appName { get; set; }
+        private string? _appName { get; set; }
 
         public LocalDatabaseService(IMessenger messenger, string liteDbPath) { 
             _liteDb = new LiteDatabase(liteDbPath);
@@ -38,6 +38,11 @@ namespace MongoDB.Sync.Services
             }
         }
 
+        public AppSyncMapping GetAppMapping(string appName)
+        {
+            var appsCollection = _liteDb.GetCollection<AppSyncMapping>("AppMappings");
+            return appsCollection.FindOne(x => x.AppName == appName);
+        }
 
         private void HandleLocalDataMappings(object recipient, InitializeLocalDataMappingMessage message)
         {
