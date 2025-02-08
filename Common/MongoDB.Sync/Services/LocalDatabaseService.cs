@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using System.Collections;
+using System;
 
 namespace MongoDB.Sync.Services
 {
@@ -83,9 +84,18 @@ namespace MongoDB.Sync.Services
         }
 
         public DateTime? GetLastSyncDateTime(string databaseName, string collectionName)
-        {
-            var collection = _liteDb.GetCollection($"{databaseName}_{collectionName}");
-            return collection.Max(x => x["__meta.dateUpdated"]).AsDateTime;
+        {            
+            var collection = _liteDb.GetCollection($"{databaseName}_{collectionName}".Replace("-", "_"));
+            var lastDoc = collection
+            .Find(Query.All("__meta.dateUpdated", Query.Descending))
+            .FirstOrDefault();
+
+            if (lastDoc != null && lastDoc["__meta"]["dateUpdated"].IsDateTime)
+            {
+                return lastDoc["__meta"]["dateUpdated"].AsDateTime;                
+            }
+
+            return null;
         }
 
         public ObjectId? GetLastId(string databaseName, string collectionName)
