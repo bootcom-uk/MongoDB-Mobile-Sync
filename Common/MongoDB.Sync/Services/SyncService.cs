@@ -91,7 +91,7 @@ namespace MongoDB.Sync.Services
                     {                        
                         var lastSyncDate = _localDatabaseService.GetLastSyncDateTime(item.DatabaseName, item.CollectionName);
                         Console.WriteLine($"Checking last sync date time for database: {item.DatabaseName} collection: {item.CollectionName}. Last date is: {lastSyncDate}");
-                        if (lastSyncDate != null) formContent.Add("LastSyncDate", $"{lastSyncDate}");
+                        if (lastSyncDate != null) formContent.Add("LastSyncDate", $"{lastSyncDate?.ToString("O")}");
                     } else
                     {
                         var lastSyncedId = _localDatabaseService.GetLastId(item.DatabaseName, item.CollectionName);
@@ -107,7 +107,6 @@ namespace MongoDB.Sync.Services
                     var response = await builder                        
                         .WithRetry(3)
                         .SendAsync<SyncResult>();
-
 
                     if (response is null || !response.Success) break;
 
