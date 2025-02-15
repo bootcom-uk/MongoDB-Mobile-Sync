@@ -13,7 +13,7 @@ namespace MongoDBDemoSync.Hubs
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, appId);
         }
-
+                
         // Sends updates to the specific app's group
         public async Task SendUpdate(string appId, object update)
         {
