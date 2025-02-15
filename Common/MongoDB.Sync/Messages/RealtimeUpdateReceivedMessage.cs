@@ -3,9 +3,9 @@ using MongoDB.Sync.Models;
 
 namespace MongoDB.Sync.Messages
 {
-    public class RealtimeUpdateReceivedMessage : ValueChangedMessage<UpdatedData>
+    public class RealtimeUpdateReceivedMessage : ValueChangedMessage<string>
     {
-        public RealtimeUpdateReceivedMessage(UpdatedData value) : base(value)
+        public RealtimeUpdateReceivedMessage(string value) : base(value)
         {
         }
     }

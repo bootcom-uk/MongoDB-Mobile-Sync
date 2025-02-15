@@ -25,33 +25,37 @@ namespace MongoDB.Sync.Services
 
         private readonly IMessenger _messenger;
 
+        private readonly NetworkStateService _networkStateService;
+
         private Func<HttpRequestMessage, Task>? _statusCheckAction;
 
         private Func<HttpRequestMessage, Task>? _preRequestAction;
 
-        public readonly LocalDatabaseService _localDatabaseService;
+        public readonly LocalDatabaseSyncService _localDatabaseService;
 
         public event EventHandler<UpdatedData>? OnDataUpdated;
 
-        public SyncService(LocalDatabaseService localDatabaseService, HttpService httpService, IMessenger messenger, string apiUrl, string appName)
+        public SyncService(LocalDatabaseSyncService localDatabaseService, HttpService httpService, IMessenger messenger, NetworkStateService networkStateService, string apiUrl, string appName)
         {
             _apiUrl = apiUrl;
             _appName = appName;
             _httpService = httpService;
             _messenger = messenger;
             _localDatabaseService = localDatabaseService;
+            _networkStateService = networkStateService; 
         }
 
 
         private void HandleRealtimeUpdate(string jsonData)
         {
-            var data = JsonSerializer.Deserialize<UpdatedData>(jsonData);
-            if (data != null)
+            
+            if (jsonData != null)
             {
                 
-                _messenger.Send<RealtimeUpdateReceivedMessage>(new RealtimeUpdateReceivedMessage(data));
+                _messenger.Send<RealtimeUpdateReceivedMessage>(new RealtimeUpdateReceivedMessage(jsonData));
 
-                OnDataUpdated?.Invoke(this, data);
+                var data = JsonSerializer.Deserialize<UpdatedData>(jsonData);
+                OnDataUpdated?.Invoke(this, data!);
             }
         }
 
@@ -65,6 +69,8 @@ namespace MongoDB.Sync.Services
         {
 
             _appDetails = _localDatabaseService.GetAppMapping();
+
+            if(_appDetails is null) throw new NullReferenceException(nameof(_appDetails));
 
             // Loop through each collection stored
             foreach (var item in _appDetails!.Collections) {
@@ -114,12 +120,15 @@ namespace MongoDB.Sync.Services
 
                     foreach (var rawDoc in response.Result!.Data)
                     {
-                        _messenger.Send<RealtimeUpdateReceivedMessage>(new RealtimeUpdateReceivedMessage(new UpdatedData()
+
+                        var updatedData = new UpdatedData()
                         {
                             Database = item.DatabaseName,
                             CollectionName = item.CollectionName,
                             Document = rawDoc
-                        }));
+                        };
+
+                        _messenger.Send<APISyncMessageReceived>(new APISyncMessageReceived(JsonSerializer.Serialize(updatedData)));
                     }
 
                     pageNumber++;
@@ -131,6 +140,92 @@ namespace MongoDB.Sync.Services
             _localDatabaseService.InitialSyncComplete();
 
         }
+
+        private async Task StartSignalRAsync()
+        {
+
+            _networkStateService.ChangeNetworkState(NetworkStateService.NetworkState.Connected);
+
+            if (_hubConnection == null)
+            {
+                _hubConnection = new HubConnectionBuilder()
+                    .WithUrl($"{_apiUrl}/hubs/update")
+                    .WithAutomaticReconnect(new[]
+                    {
+                TimeSpan.FromSeconds(0),
+                TimeSpan.FromSeconds(2),
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(10)
+                    })
+                    .Build();
+            }
+
+            // Triggered when SignalR starts reconnecting
+            _hubConnection.Reconnecting += (error) =>
+            {
+                Console.WriteLine("🔄 SignalR reconnecting...");
+                return Task.CompletedTask;
+            };
+
+            // Triggered when SignalR successfully reconnects
+            _hubConnection.Reconnected += async (connectionId) =>
+            {
+                Console.WriteLine($"✅ SignalR reconnected! ConnectionId: {connectionId}");
+                _networkStateService.ChangeNetworkState(NetworkStateService.NetworkState.Connected);
+                await ResubscribeToSignalR();
+            };
+
+            // Triggered when SignalR loses connection completely
+            _hubConnection.Closed += async (error) =>
+            {
+                Console.WriteLine("❌ SignalR connection closed. Attempting reconnect...");
+                _networkStateService.ChangeNetworkState(NetworkStateService.NetworkState.Disconnected);
+
+                // Keep trying to reconnect in the background
+                await AttemptReconnect();
+            };
+
+            await _hubConnection.StartAsync();
+
+            await _hubConnection.InvokeAsync("SubscribeToApp", _appName);
+
+            // Set up handler for receiving real-time updates
+            _hubConnection.On<string>("ReceiveUpdate", HandleRealtimeUpdate);
+
+            _syncIsStarting = false;
+        }
+
+        // Attempt to reconnect manually if the automatic reconnect fails
+        private async Task AttemptReconnect()
+        {
+            while (_hubConnection!.State == HubConnectionState.Disconnected)
+            {
+                try
+                {
+                    Console.WriteLine("🔄 Trying to reconnect to SignalR...");
+                    await _hubConnection.StartAsync();
+                    Console.WriteLine("✅ Reconnected!");
+
+                    // Resubscribe to updates
+                    await ResubscribeToSignalR();
+                    return;
+                }
+                catch
+                {
+                    Console.WriteLine("⚠️ Reconnect failed. Retrying in 5 seconds...");
+                    await Task.Delay(5000);
+                }
+            }
+        }
+
+        // Resubscribe to the SignalR hub after reconnecting
+        private async Task ResubscribeToSignalR()
+        {
+            await _hubConnection!.InvokeAsync("SubscribeToApp", _appName);
+
+            await PerformAPISync();
+        }
+
 
         public async Task StartSyncAsync(Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction)
         {
@@ -149,27 +244,11 @@ namespace MongoDB.Sync.Services
 
             _appDetails.AppName = _appName;
 
-            var hubUrl = $"{_apiUrl}/hubs/update";
-
-            _hubConnection = new HubConnectionBuilder()
-                .WithUrl(hubUrl)
-                .Build();
-
-            // Set up handler for receiving real-time updates
-            _hubConnection.On<string>("ReceiveUpdate", HandleRealtimeUpdate);
-
-            if (_hubConnection.State == HubConnectionState.Disconnected)
-            {
-                await _hubConnection.StartAsync();
-            }
-
-            await _hubConnection.InvokeAsync("SubscribeToApp", _appName);
-
             _messenger.Send<InitializeLocalDataMappingMessage>(new InitializeLocalDataMappingMessage(_appDetails));
 
             await PerformAPISync();
-            
-            _syncIsStarting = false;
+
+            await StartSignalRAsync();
 
             return;
         }

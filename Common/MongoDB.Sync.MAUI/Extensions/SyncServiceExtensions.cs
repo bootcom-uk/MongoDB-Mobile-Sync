@@ -1,12 +1,14 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Logging;
 using MongoDB.Sync.Interfaces;
 using MongoDB.Sync.MAUI.Models;
 using MongoDB.Sync.Services;
-using Microsoft.Extensions.Http.Resilience;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http;
 using Services;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 
 namespace MongoDB.Sync.MAUI.Extensions
 {
@@ -22,6 +24,8 @@ namespace MongoDB.Sync.MAUI.Extensions
             builder.Services.AddHttpClient();
             builder.Services.Configure(syncOptionsAction);
             
+            builder.Services.AddSingleton<NetworkStateService>();
+
             // Register SyncOptions as a singleton service
             builder.Services.AddSingleton(provider =>
             {
@@ -31,13 +35,12 @@ namespace MongoDB.Sync.MAUI.Extensions
             });
 
             // Register the local database service
-            builder.Services.AddSingleton<LocalDatabaseService>(provider =>
+            builder.Services.AddSingleton<LocalDatabaseSyncService>(provider =>
             {
                 var options = provider.GetRequiredService<SyncOptions>();
                 var messenger = provider.GetRequiredService<IMessenger>();
-                return new LocalDatabaseService(messenger, options.LiteDbPath);
+                return new LocalDatabaseSyncService(messenger, options.LiteDbPath);
             });
-
 
             builder.Services.AddSingleton<HttpService>();
             
@@ -46,7 +49,15 @@ namespace MongoDB.Sync.MAUI.Extensions
                 var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
                 var options = provider.GetRequiredService<SyncOptions>();
                 var messenger = provider.GetRequiredService<IMessenger>();
-                return new SyncService(provider.GetRequiredService<LocalDatabaseService>(), provider.GetRequiredService<HttpService>(), messenger, options.ApiUrl, options.AppName);
+                var networkStateService = provider.GetRequiredService<NetworkStateService>();
+                return new SyncService(provider.GetRequiredService<LocalDatabaseSyncService>(), provider.GetRequiredService<HttpService>(), messenger, networkStateService, options.ApiUrl, options.AppName);
+            });
+
+            builder.Services.AddSingleton<LocalCacheService>(provider =>
+            {
+                var localDatabaseSyncService = provider.GetRequiredService<LocalDatabaseSyncService>();
+                var logger = provider.GetRequiredService<ILogger<LocalCacheService>>();
+                return new LocalCacheService(localDatabaseSyncService, logger);
             });
 
             return builder;
