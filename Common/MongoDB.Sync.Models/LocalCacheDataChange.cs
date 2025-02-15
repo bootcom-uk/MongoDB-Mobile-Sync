@@ -7,12 +7,6 @@ namespace MongoDB.Sync.Models
     {
 
         /// <summary>
-        /// Specifies the unique identifier of the change
-        /// </summary>
-        [DatabaseFieldName("_id")]
-        public ObjectId Id { get; set; }
-
-        /// <summary>
         /// Specifies the timestamp of the change
         /// </summary>
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
@@ -27,10 +21,6 @@ namespace MongoDB.Sync.Models
         /// </summary>
         public bool IsDeletion { get; set; } = false;
 
-        /// <summary>
-        /// Where the action is not a deletion, this contains the document of changes
-        /// </summary>
-        public BsonDocument? Document { get; set; }
     }
     
 }
