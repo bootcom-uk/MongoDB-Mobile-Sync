@@ -1,6 +1,8 @@
 ﻿using LiteDB;
 using Microsoft.Extensions.Logging;
 using MongoDB.Sync.LocalDataCache;
+using MongoDB.Sync.Models;
+using MongoDB.Sync.Models.Attributes;
 using System.Reflection;
 
 namespace MongoDB.Sync.Services
@@ -125,7 +127,7 @@ namespace MongoDB.Sync.Services
             // Record doesn't exist so exit
             if (record is null) return;
 
-            Enqueue(new LocalCacheDataChange
+            Enqueue(new SyncLocalCacheDataChange
             {
                 CollectionName = attribute.CollectionName,
                 IsDeletion = true,
