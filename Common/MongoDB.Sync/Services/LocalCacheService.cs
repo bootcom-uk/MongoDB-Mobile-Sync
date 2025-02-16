@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using MongoDB.Sync.LocalDataCache;
 using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
+using Services;
 using System.Reflection;
 
 namespace MongoDB.Sync.Services
@@ -12,10 +13,20 @@ namespace MongoDB.Sync.Services
 
         private readonly LiteDatabase _db;
         private readonly ILogger<LocalCacheService> _logger;
+        private readonly HttpService _httpService;
+        private readonly string _apiUrl;
+        private readonly string _appName;
+        private readonly Func<HttpRequestMessage, Task>? _preRequestAction;
+        private readonly Func<HttpRequestMessage, Task>? _statusChangeAction;
 
-        public LocalCacheService(LocalDatabaseSyncService localDatabaseSyncService, ILogger<LocalCacheService> logger)
+        public LocalCacheService(LocalDatabaseSyncService localDatabaseSyncService, ILogger<LocalCacheService> logger, HttpService httpService, string apiUrl, string appName, Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction)
         {
             _logger = logger;
+            _httpService = httpService;
+            _apiUrl = apiUrl;
+            _appName = appName;
+            _preRequestAction = preRequestAction;
+            _statusChangeAction = statusChangeAction;
 
             // Define LiteDB file location in MAUI            
             _db = localDatabaseSyncService.LiteDb;
@@ -71,10 +82,23 @@ namespace MongoDB.Sync.Services
             return idValue;
         }
 
-        private Queue<LocalCacheDataChange> _changesToProcess = new();
+        private Queue<SyncLocalCacheDataChange> _changesToProcess = new();
 
         private async Task ProcessQueue()
         {
+
+            // When starting up we need to load any changes that haven't been processed
+            var collectionNameAttribute = typeof(SyncLocalCacheDataChange).GetCustomAttribute<CollectionNameAttribute>();
+            if (collectionNameAttribute is null) throw new InvalidOperationException("CollectionNameAttribute is missing");
+
+            var collection = _db.GetCollection<SyncLocalCacheDataChange>(collectionNameAttribute.CollectionName);
+
+            var records = collection.FindAll().OrderBy(record => record.Timestamp);
+            foreach (var record in records)
+            {
+                _changesToProcess.Enqueue(record);
+            }
+
             while (true)
             {
                 // No changes to process so wait for a bit
@@ -84,18 +108,42 @@ namespace MongoDB.Sync.Services
                     continue;
                 }
                 
-                var localCacheDataChange = _changesToProcess.Dequeue();
+                var localCacheDataChange = _changesToProcess.Peek();
 
+                var builder = _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/Send/{_appName}"), HttpMethod.Post);
+
+                if(_preRequestAction != null)
+                {
+                    builder.PreRequest(_preRequestAction);
+                }
+
+                if(_statusChangeAction != null)
+                {
+                    builder.OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusChangeAction);
+                }
+
+                builder.WithRetry(3);
+
+                var response = await builder.SendAsync();
+
+                if (response.Success)
+                {
+                    // Clear out from the local cache
+                    collection.DeleteMany(record => record.InternalId == localCacheDataChange.InternalId && record.Id == localCacheDataChange.Id);
+
+                    // Successfully processed the change so remove it from the queue
+                    _changesToProcess.Dequeue();
+                }
 
             }
         }
 
-        private void Enqueue(LocalCacheDataChange localCacheDataChange)
+        private void Enqueue(SyncLocalCacheDataChange localCacheDataChange)
         {
             var collectionNameAttribute = localCacheDataChange.GetType().GetCustomAttribute<CollectionNameAttribute>();
             if (collectionNameAttribute is null) throw new InvalidOperationException("CollectionNameAttribute is missing");
 
-            var collection = _db.GetCollection<LocalCacheDataChange>(collectionNameAttribute.CollectionName);   
+            var collection = _db.GetCollection<SyncLocalCacheDataChange>(collectionNameAttribute.CollectionName);   
 
             collection.Upsert(localCacheDataChange);
             _changesToProcess.Enqueue(localCacheDataChange);
@@ -109,6 +157,14 @@ namespace MongoDB.Sync.Services
             var collection = _db.GetCollection<T>(attribute.CollectionName);
             var idValue = GetId(item);
             if (idValue is null) return;
+
+            Enqueue(new SyncLocalCacheDataChange
+            {
+                CollectionName = attribute.CollectionName,
+                IsDeletion = false,
+                Id = idValue,
+                Document = BsonMapper.Global.ToDocument(item)
+            });
 
         }
 
