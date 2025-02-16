@@ -11,10 +11,12 @@ namespace MongoDB.Sync.Web.Services
         private readonly IMongoDatabase _appServicesDb;
         private readonly ILogger<AppSyncService> _logger;
         private const int BatchSize = 100; // Define your batch size
+        private readonly IMongoClient _mongoClient;
 
         public AppSyncService(IMongoClient mongoClient, ILogger<AppSyncService> logger)
         {
             _appServicesDb = mongoClient.GetDatabase("AppServices");
+            _mongoClient = mongoClient;
             _logger = logger;
         }
 
@@ -35,6 +37,66 @@ namespace MongoDB.Sync.Web.Services
 
             return appMapping;
         }
+
+        public async Task WriteDataToMongo(string appName, WebLocalCacheDataChange webLocalCacheDataChange)
+        {
+            if (!webLocalCacheDataChange.IsDeletion && webLocalCacheDataChange.Document is null) return;
+
+            var appMapping = await GetAppInformation(appName);
+            if (appMapping is null || !appMapping.HasInitialSyncComplete || appMapping.Collections is null) return;
+
+            var collectionMapping = appMapping.Collections
+                .FirstOrDefault(c => $"{c.DatabaseName}_{c.CollectionName}".Replace("-", "_") == webLocalCacheDataChange.CollectionName);
+
+            if (collectionMapping is null) return;
+
+            var database = _mongoClient.GetDatabase(collectionMapping.DatabaseName);
+            var collection = database.GetCollection<BsonDocument>(collectionMapping.CollectionName);
+
+            // Handle Deletion
+            if (webLocalCacheDataChange.IsDeletion)
+            {
+                var filter = Builders<BsonDocument>.Filter.Eq("_id", webLocalCacheDataChange.Id);
+                await collection.DeleteOneAsync(filter);
+                return;
+            }
+
+            // Filter allowed fields for insert/update
+            var allowedFields = collectionMapping.Fields ?? new List<string>();
+            var filteredDocument = new BsonDocument(
+                webLocalCacheDataChange.Document!
+                    .Where(field => allowedFields.Contains(field.Name)) // Only include allowed fields
+                    .ToDictionary(kvp => kvp.Name, kvp => kvp.Value)
+            );
+
+            var filterById = Builders<BsonDocument>.Filter.Eq("_id", webLocalCacheDataChange.Id);
+            var existingRecord = await collection.Find(filterById).FirstOrDefaultAsync();
+
+            if (existingRecord is null)
+            {
+                // Insert new record with filtered fields
+                await collection.InsertOneAsync(filteredDocument);
+            }
+            else
+            {
+                // Prepare an update definition with only changed fields
+                var updateDefinitions = new List<UpdateDefinition<BsonDocument>>();
+                foreach (var field in allowedFields)
+                {
+                    if (filteredDocument.Contains(field) && (!existingRecord.Contains(field) || existingRecord[field] != filteredDocument[field]))
+                    {
+                        updateDefinitions.Add(Builders<BsonDocument>.Update.Set(field, filteredDocument[field]));
+                    }
+                }
+
+                if (updateDefinitions.Any())
+                {
+                    var updateDefinition = Builders<BsonDocument>.Update.Combine(updateDefinitions);
+                    await collection.UpdateOneAsync(filterById, updateDefinition);
+                }
+            }
+        }
+
 
         public bool UserHasPermission(string appId, string userId)
         {
