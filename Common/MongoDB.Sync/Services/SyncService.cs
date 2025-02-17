@@ -35,14 +35,16 @@ namespace MongoDB.Sync.Services
 
         public event EventHandler<UpdatedData>? OnDataUpdated;
 
-        public SyncService(LocalDatabaseSyncService localDatabaseService, HttpService httpService, IMessenger messenger, NetworkStateService networkStateService, string apiUrl, string appName)
+        public SyncService(LocalDatabaseSyncService localDatabaseService, HttpService httpService, IMessenger messenger, NetworkStateService networkStateService, string apiUrl, string appName, Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction)
         {
             _apiUrl = apiUrl;
             _appName = appName;
             _httpService = httpService;
             _messenger = messenger;
             _localDatabaseService = localDatabaseService;
-            _networkStateService = networkStateService; 
+            _networkStateService = networkStateService;
+            _statusCheckAction = statusChangeAction;
+            _preRequestAction = preRequestAction;
         }
 
 
@@ -227,13 +229,10 @@ namespace MongoDB.Sync.Services
         }
 
 
-        public async Task StartSyncAsync(Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction)
+        public async Task StartSyncAsync()
         {
 
             if (_syncHasStarted || _syncIsStarting) return;
-
-            if(statusChangeAction != null) _statusCheckAction = statusChangeAction;
-            if (preRequestAction != null) _preRequestAction = preRequestAction;
 
             _syncIsStarting = true;
 
@@ -266,7 +265,7 @@ namespace MongoDB.Sync.Services
 
         public async Task ResumeSyncAsync()
         {
-            await StartSyncAsync(null, _statusCheckAction);
+            await StartSyncAsync();
         }
 
         public async Task ClearCacheAsync()
