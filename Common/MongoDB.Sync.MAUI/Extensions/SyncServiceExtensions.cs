@@ -29,7 +29,7 @@ namespace MongoDB.Sync.MAUI.Extensions
             // Register SyncOptions as a singleton service
             builder.Services.AddSingleton(provider =>
             {
-                var options = new SyncOptions();
+                var options = new SyncOptions(provider.GetRequiredService<HttpService>());                
                 syncOptionsAction(options);
                 return options;
             });
