@@ -122,6 +122,7 @@ namespace MongoDB.Sync.Services
                     builder.OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusChangeAction);
                 }
 
+                builder.WithJsonContent<SyncLocalCacheDataChange>(localCacheDataChange);
                 builder.WithRetry(3);
 
                 var response = await builder.SendAsync();
