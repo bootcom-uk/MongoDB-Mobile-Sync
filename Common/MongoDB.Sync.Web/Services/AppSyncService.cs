@@ -68,7 +68,7 @@ namespace MongoDB.Sync.Web.Services
                 await collection.DeleteOneAsync(filter);
                 return new()
                 {
-                    { "message", "Successfully deleted record" }
+                    { "message", $"Successfully deleted record with filter: {filter.ToJson()}" }
                 };
             }
 
