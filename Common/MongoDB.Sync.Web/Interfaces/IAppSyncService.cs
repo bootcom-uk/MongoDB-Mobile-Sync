@@ -6,7 +6,7 @@ namespace MongoDB.Sync.Web.Interfaces
     {
         bool UserHasPermission(string appId, string userId);
 
-        Task WriteDataToMongo(string appName, WebLocalCacheDataChange webLocalCacheDataChange);
+        Task<Dictionary<string, string>?> WriteDataToMongo(string appName, WebLocalCacheDataChange webLocalCacheDataChange);
 
         Task<SyncResult> SyncAppDataAsync(string appName,
     string userId,
