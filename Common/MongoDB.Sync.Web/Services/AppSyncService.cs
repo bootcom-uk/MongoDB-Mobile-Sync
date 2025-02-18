@@ -38,17 +38,25 @@ namespace MongoDB.Sync.Web.Services
             return appMapping;
         }
 
-        public async Task WriteDataToMongo(string appName, WebLocalCacheDataChange webLocalCacheDataChange)
+        public async Task<Dictionary<string, string>?> WriteDataToMongo(string appName, WebLocalCacheDataChange webLocalCacheDataChange)
         {
-            if (!webLocalCacheDataChange.IsDeletion && webLocalCacheDataChange.Document is null) return;
+            if (!webLocalCacheDataChange.IsDeletion && webLocalCacheDataChange.Document is null) return new () {
+                { "error", "Document is null" }
+            };
 
             var appMapping = await GetAppInformation(appName);
-            if (appMapping is null || !appMapping.HasInitialSyncComplete || appMapping.Collections is null) return;
+            if (appMapping is null || !appMapping.HasInitialSyncComplete || appMapping.Collections is null) return new()
+            {
+                { "error", "App mapping not found or initial sync not complete"   }
+            };
 
             var collectionMapping = appMapping.Collections
                 .FirstOrDefault(c => $"{c.DatabaseName}_{c.CollectionName}".Replace("-", "_") == webLocalCacheDataChange.CollectionName);
 
-            if (collectionMapping is null) return;
+            if (collectionMapping is null) return new()
+            {
+                { "error", "Collection mapping not found"   }
+            };
 
             var database = _mongoClient.GetDatabase(collectionMapping.DatabaseName);
             var collection = database.GetCollection<BsonDocument>(collectionMapping.CollectionName);
@@ -58,7 +66,10 @@ namespace MongoDB.Sync.Web.Services
             {
                 var filter = Builders<BsonDocument>.Filter.Eq("_id", webLocalCacheDataChange.Id);
                 await collection.DeleteOneAsync(filter);
-                return;
+                return new()
+                {
+                    { "message", "Successfully deleted record" }
+                };
             }
 
             // Filter allowed fields for insert/update
@@ -95,6 +106,7 @@ namespace MongoDB.Sync.Web.Services
                     await collection.UpdateOneAsync(filterById, updateDefinition);
                 }
             }
+            return null;
         }
 
 
