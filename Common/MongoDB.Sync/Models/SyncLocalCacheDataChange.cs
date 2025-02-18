@@ -10,7 +10,7 @@ namespace MongoDB.Sync.Models
         /// Specifies the unique identifier of the change
         /// </summary>
         [DatabaseFieldName("_id")]
-        public ObjectId Id { get; set; }
+        public string Id { get; set; }
 
 
         /// <summary>

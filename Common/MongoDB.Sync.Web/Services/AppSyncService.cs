@@ -64,7 +64,7 @@ namespace MongoDB.Sync.Web.Services
             // Handle Deletion
             if (webLocalCacheDataChange.IsDeletion)
             {                
-                await collection.DeleteOneAsync(record => record["_id"] == webLocalCacheDataChange.Id);
+                await collection.DeleteOneAsync(record => record["_id"] == new ObjectId(webLocalCacheDataChange.Id));
                 return new()
                 {
                     { "message", $"Successfully deleted record." }
