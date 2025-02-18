@@ -63,12 +63,11 @@ namespace MongoDB.Sync.Web.Services
 
             // Handle Deletion
             if (webLocalCacheDataChange.IsDeletion)
-            {
-                var filter = Builders<BsonDocument>.Filter.Eq("_id", webLocalCacheDataChange.Id);
-                await collection.DeleteOneAsync(filter);
+            {                
+                await collection.DeleteOneAsync(record => record["_id"] == webLocalCacheDataChange.Id);
                 return new()
                 {
-                    { "message", $"Successfully deleted record with filter: {filter.ToJson()}" }
+                    { "message", $"Successfully deleted record." }
                 };
             }
 
