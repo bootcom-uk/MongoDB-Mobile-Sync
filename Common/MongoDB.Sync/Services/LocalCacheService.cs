@@ -129,6 +129,7 @@ namespace MongoDB.Sync.Services
 
                 if (response.Success)
                 {
+                    
                     // Clear out from the local cache
                     collection.DeleteMany(record => record.InternalId == localCacheDataChange.InternalId && record.Id == localCacheDataChange.Id);
 
@@ -143,6 +144,9 @@ namespace MongoDB.Sync.Services
         {
             var collectionNameAttribute = localCacheDataChange.GetType().GetCustomAttribute<CollectionNameAttribute>();
             if (collectionNameAttribute is null) throw new InvalidOperationException("CollectionNameAttribute is missing");
+
+            var primaryCollection = _db.GetCollection<BsonDocument>(localCacheDataChange.CollectionName);
+            primaryCollection.Delete(new ObjectId(localCacheDataChange.Id));
 
             var collection = _db.GetCollection<SyncLocalCacheDataChange>(collectionNameAttribute.CollectionName);   
 
