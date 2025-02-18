@@ -163,7 +163,7 @@ namespace MongoDB.Sync.Services
             {
                 CollectionName = attribute.CollectionName,
                 IsDeletion = false,
-                Id = idValue,
+                Id = idValue.ToString(),
                 Document = BsonMapper.Global.ToDocument(item)
             });
 
@@ -188,7 +188,7 @@ namespace MongoDB.Sync.Services
             {
                 CollectionName = attribute.CollectionName,
                 IsDeletion = true,
-                Id = idValue
+                Id = idValue.ToString()
             });
         }
 
