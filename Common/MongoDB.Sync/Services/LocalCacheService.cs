@@ -4,6 +4,7 @@ using MongoDB.Sync.LocalDataCache;
 using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
 using Services;
+using System.Collections;
 using System.Reflection;
 
 namespace MongoDB.Sync.Services
@@ -145,8 +146,14 @@ namespace MongoDB.Sync.Services
             var collectionNameAttribute = localCacheDataChange.GetType().GetCustomAttribute<CollectionNameAttribute>();
             if (collectionNameAttribute is null) throw new InvalidOperationException("CollectionNameAttribute is missing");
 
-            var primaryCollection = _db.GetCollection<BsonDocument>(localCacheDataChange.CollectionName);
-            primaryCollection.Delete(new ObjectId(localCacheDataChange.Id));
+            // If a removal then clear from the local cache
+            if(localCacheDataChange.IsDeletion)
+            {
+                var primaryCollection = _db.GetCollection<BsonDocument>(localCacheDataChange.CollectionName);
+                primaryCollection.Delete(new ObjectId(localCacheDataChange.Id));
+            }
+
+            LiteDBChangeNotifier.NotifyChange(localCacheDataChange.CollectionName);
 
             var collection = _db.GetCollection<SyncLocalCacheDataChange>(collectionNameAttribute.CollectionName);   
 
