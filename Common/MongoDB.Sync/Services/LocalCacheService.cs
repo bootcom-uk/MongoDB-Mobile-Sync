@@ -1,6 +1,8 @@
-﻿using LiteDB;
+﻿using CommunityToolkit.Mvvm.Messaging;
+using LiteDB;
 using Microsoft.Extensions.Logging;
 using MongoDB.Sync.LocalDataCache;
+using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
 using Services;
@@ -19,8 +21,9 @@ namespace MongoDB.Sync.Services
         private readonly string _appName;
         private readonly Func<HttpRequestMessage, Task>? _preRequestAction;
         private readonly Func<HttpRequestMessage, Task>? _statusChangeAction;
+        private readonly IMessenger _messenger;
 
-        public LocalCacheService(LocalDatabaseSyncService localDatabaseSyncService, ILogger<LocalCacheService> logger, HttpService httpService, string apiUrl, string appName, Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction)
+        public LocalCacheService(IMessenger messenger, LocalDatabaseSyncService localDatabaseSyncService, ILogger<LocalCacheService> logger, HttpService httpService, string apiUrl, string appName, Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction)
         {
             _logger = logger;
             _httpService = httpService;
@@ -28,8 +31,7 @@ namespace MongoDB.Sync.Services
             _appName = appName;
             _preRequestAction = preRequestAction;
             _statusChangeAction = statusChangeAction;
-
-            // Define LiteDB file location in MAUI            
+            _messenger = messenger; 
             _db = localDatabaseSyncService.LiteDb;
 
             Task.Run(ProcessQueue);
@@ -47,7 +49,7 @@ namespace MongoDB.Sync.Services
             return _db.GetCollection<T>(name);
         }
 
-        public LiveQueryableLiteCollection<T> GetLiveCollection<T>(string name, Func<T, bool> filter = null) where T : new()
+        public LiveQueryableLiteCollection<T> GetLiveCollection<T>(string name, Func<T, bool>? filter = null) where T : new()
         {
             return new LiveQueryableLiteCollection<T>(_db, name, filter);
         }
@@ -153,7 +155,13 @@ namespace MongoDB.Sync.Services
                 primaryCollection.Delete(new ObjectId(localCacheDataChange.Id));
             }
 
-            LiteDBChangeNotifier.NotifyChange(localCacheDataChange.CollectionName);
+            _messenger.Send(new DatabaseChangeMessage(new()
+            {
+                ChangedItem = localCacheDataChange.Document,
+                IsDeleted = localCacheDataChange.IsDeletion,
+                CollectionName = localCacheDataChange.CollectionName,
+                Id = new ObjectId(localCacheDataChange.Id)
+            }));
 
             var collection = _db.GetCollection<SyncLocalCacheDataChange>(collectionNameAttribute.CollectionName);   
 

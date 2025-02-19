@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.Messaging;
+﻿using CommunityToolkit.Mvvm.DependencyInjection;
+using CommunityToolkit.Mvvm.Messaging;
 using LiteDB;
 using MongoDB.Sync.LocalDataCache;
 using MongoDB.Sync.Messages;
@@ -141,29 +142,38 @@ namespace MongoDB.Sync.Services
 
             var collection = LiteDb.GetCollection(collectionName);
 
+            BsonValue? docId;
+            BsonValue? isDeleted = null;
+
+            if (!doc.TryGetValue("_id", out docId))
+            {
+                return;
+            }
+
+            doc.TryGetValue("__meta", out var metaField);
+            metaField.AsDocument.TryGetValue("deleted", out isDeleted);
+
             // If the document has been removed at the server level then clear out 
             // of our local cache
-            if (doc.TryGetValue("__meta", out var metaField) &&
-            metaField.AsDocument.TryGetValue("deleted", out var isDeleted))
+            if (isDeleted != null && isDeleted.AsBoolean)
             {
-                if (isDeleted.AsBoolean)
-                {
-                    if (doc.TryGetValue("_id", out var docId))
-                    {
-                        collection.Delete(docId);
-                        return;
-                    }
-                }
+                collection.Delete(docId);
+                return;
             }
 
             // Insert/update document
             collection.Upsert(doc);
 
-            LiteDBChangeNotifier.NotifyChange(collectionName);
+            _messenger.Send(new DatabaseChangeMessage(new()
+            {
+                ChangedItem = doc,
+                IsDeleted = isDeleted!.AsBoolean,
+                CollectionName = collectionName,
+                Id = docId.AsObjectId
+            }));
 
-            // Update the last id in the database
-            doc.TryGetValue("_id", out var lastId);
-            SetLastId(updateData.Database, updateData.CollectionName, lastId.AsObjectId);
+            // Update the last id in the database           
+            SetLastId(updateData.Database, updateData.CollectionName, docId.AsObjectId);
         }
 
         private void HandleRealtimeUpdate(object recipient, RealtimeUpdateReceivedMessage message)
@@ -196,7 +206,14 @@ namespace MongoDB.Sync.Services
                     // If the doc is marked as deleted, remove it from the local cache 
                    var deleted = collection.Delete(documentId);
 
-                    LiteDBChangeNotifier.NotifyChange(collectionName);
+                    _messenger.Send(new DatabaseChangeMessage(new()
+                    {
+                        ChangedItem = null,
+                        IsDeleted = isDeleted!.AsBoolean,
+                        CollectionName = collectionName,
+                        Id = documentId
+                    }));
+
                     return;
                 }
 
@@ -226,7 +243,13 @@ namespace MongoDB.Sync.Services
 
                 }
 
-                LiteDBChangeNotifier.NotifyChange(collectionName);
+                _messenger.Send(new DatabaseChangeMessage(new()
+                {
+                    ChangedItem = updateDoc,
+                    IsDeleted = false,
+                    CollectionName = collectionName,
+                    Id = documentId
+                }));
 
             }
             catch (Exception ex)
