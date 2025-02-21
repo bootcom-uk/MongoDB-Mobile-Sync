@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using LiteDB;
 using MongoDB.Sync.Messages;
+using MongoDB.Sync.Models;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -10,17 +11,23 @@ using System.Text.Json;
 namespace MongoDB.Sync.LocalDataCache
 {
 
-        public class LiveQueryableLiteCollection<T> :  ObservableCollection<T> where T : new()
+        public class LiveQueryableLiteCollection<T> :  ObservableCollection<T> where T : BaseLocalCacheModel
     {
         private readonly LiteDatabase _db;
         private readonly ILiteCollection<T> _collection;
         private Func<T, bool>? _filter;
+        Func<IQueryable<T>, IOrderedQueryable<T>>? _order;
 
-        public LiveQueryableLiteCollection(LiteDatabase db, string collectionName, Func<T, bool>? filter = null)
+        public LiveQueryableLiteCollection(
+     LiteDatabase db,
+     string collectionName,
+     Func<T, bool>? filter = null,
+     Func<IQueryable<T>, IOrderedQueryable<T>>? order = null)
         {
             _db = db;
             _collection = _db.GetCollection<T>(collectionName);
             _filter = filter;
+            _order = order;
 
             // Load Initial Data
             ReloadData();
@@ -31,45 +38,73 @@ namespace MongoDB.Sync.LocalDataCache
 
         private void ReloadData()
         {
-            var records = _collection.FindAll().Where(_filter ?? (_ => true)).ToList();
-            UpdateCollection(records);
-        }
+            var query = _collection.FindAll().AsQueryable();
 
-        private void UpdateCollection(List<T> newRecords)
-        {
-            // Use HashSet for fast lookup
-            var currentItems = new HashSet<T>(this);
-            var newItems = new HashSet<T>(newRecords);
+            if (_filter != null)
+            {
+                query = query.Where(_filter).AsQueryable();
+            }
 
-            // Find removed items
-            var toRemove = currentItems.Except(newItems).ToList();
-            foreach (var item in toRemove)
-                Remove(item);
+            if (_order != null)
+            {
+                query = _order(query);
+            }
 
-            // Find new items
-            var toAdd = newItems.Except(currentItems).ToList();
-            foreach (var item in toAdd)
-                Add(item);
+            var records = query.ToList();
+
+            Clear();
+            foreach (var record in records)
+            {
+                Add(record);
+            }
         }
 
         private void OnDatabaseChanged(object recipient, DatabaseChangeMessage message)
         {
             if (message.Value.CollectionName != _collection.Name) return; // Ignore other collections
 
-            var item = BsonMapper.Global.ToObject<T>(message.Value.ChangedItem);
-
+            
             // Handle deletions
             if (message.Value.IsDeleted)
             {
-                var itemToRemove = this.FirstOrDefault(x => x.Equals(item));
+
+                var itemToRemove = this.FirstOrDefault(x => x.Id == message.Value.Id);
                 if (itemToRemove != null)
                     Remove(itemToRemove);
                 return;
             }
 
-            if (!this.Contains(item))
-                    Add(item);
-            
+            var existingItem = this.FirstOrDefault(x => x.Id == message.Value.Id);
+            var record = _collection.FindById(new ObjectId(message.Value.Id));
+
+            var tmpList = new List<T>()
+                {
+                    record
+                };
+
+            if (existingItem is null)
+            {
+                
+                if (_filter != null)
+                {
+                    if (tmpList.Where(_filter).Count() == 0) return;
+                }
+
+                Add(record);
+                return;
+            }
+
+            foreach (var prpInfo in typeof(T).GetProperties())
+            {
+                var value = prpInfo.GetValue(record);
+                prpInfo.SetValue(existingItem, value);
+            }
+                        
+            if (_filter != null)
+            {
+                if (tmpList.Where(_filter).Count() == 0) Remove(record);
+            }
+
         }
     }
 
