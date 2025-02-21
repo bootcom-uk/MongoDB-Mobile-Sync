@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using LiteDB;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Controls;
 using MongoDB.Sync.LocalDataCache;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
@@ -8,6 +9,8 @@ using MongoDB.Sync.Models.Attributes;
 using Services;
 using System.Collections;
 using System.Reflection;
+using System.Text.Json;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace MongoDB.Sync.Services
 {
@@ -49,40 +52,9 @@ namespace MongoDB.Sync.Services
             return _db.GetCollection<T>(name);
         }
 
-        public LiveQueryableLiteCollection<T> GetLiveCollection<T>(string name, Func<T, bool>? filter = null) where T : new()
+        public LiveQueryableLiteCollection<T> GetLiveCollection<T>(string name, Func<T, bool>? filter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? order = null) where T : BaseLocalCacheModel
         {
-            return new LiveQueryableLiteCollection<T>(_db, name, filter);
-        }
-
-        private ObjectId? GetId<T>(T item)
-        {
-            var idValue = (null as ObjectId);
-
-            foreach(var fldInfo in item.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
-            {
-                var databaseFieldNameAttribute = fldInfo.GetCustomAttribute<DatabaseFieldNameAttribute>();
-                if (databaseFieldNameAttribute is null) continue;
-                if (databaseFieldNameAttribute.DatabaseFieldName == "_id")
-                {
-                    return fldInfo.GetValue(item) as ObjectId;
-                }
-            }
-
-            foreach (var prop in item.GetType().GetProperties())
-            {
-                if (prop.Name == "_id")
-                {
-                    return prop.GetValue(item) as ObjectId;
-                }
-
-                var databaseFieldNameAttribute = prop.GetCustomAttribute<DatabaseFieldNameAttribute>();
-                if (databaseFieldNameAttribute is null) continue;
-                if (databaseFieldNameAttribute.DatabaseFieldName == "_id")
-                {
-                    return prop.GetValue(item) as ObjectId;
-                }
-            }
-            return idValue;
+            return new LiveQueryableLiteCollection<T>(_db, name, filter, order);
         }
 
         private Queue<SyncLocalCacheDataChange> _changesToProcess = new();
@@ -112,7 +84,11 @@ namespace MongoDB.Sync.Services
                 }
                 
                 var localCacheDataChange = _changesToProcess.Peek();
-
+                if (localCacheDataChange != null)
+                {
+                    localCacheDataChange.SerializedDocument = JsonSerializer.Serialize(localCacheDataChange.Document);
+                }
+                
                 var builder = _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/Send/{_appName}"), HttpMethod.Post);
 
                 if(_preRequestAction != null)
@@ -125,7 +101,7 @@ namespace MongoDB.Sync.Services
                     builder.OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusChangeAction);
                 }
 
-                builder.WithJsonContent<SyncLocalCacheDataChange>(localCacheDataChange);
+                builder.WithJsonContent<LocalCacheDataChange>(localCacheDataChange);
                 builder.WithRetry(3);
 
                 var response = await builder.SendAsync();
@@ -155,7 +131,7 @@ namespace MongoDB.Sync.Services
                 primaryCollection.Delete(new ObjectId(localCacheDataChange.Id));
             }
 
-            _messenger.Send(new DatabaseChangeMessage(new()
+            _messenger.Send(new DatabaseChangeMessage(new DatabaseChangeParameters()
             {
                 ChangedItem = localCacheDataChange.Document,
                 IsDeleted = localCacheDataChange.IsDeletion,
@@ -169,13 +145,13 @@ namespace MongoDB.Sync.Services
             _changesToProcess.Enqueue(localCacheDataChange);
         }
 
-        public void Save<T>(T item) 
+        public void Save<T>(T item) where T : BaseLocalCacheModel
         {
             if (item is null) throw new ArgumentNullException(nameof(item));
             var attribute = item.GetType().GetCustomAttribute<CollectionNameAttribute>();
             if(attribute is null) throw new InvalidOperationException("CollectionNameAttribute is missing");
             var collection = _db.GetCollection<T>(attribute.CollectionName);
-            var idValue = GetId(item);
+            var idValue = item.Id;
             if (idValue is null) return;
 
             Enqueue(new SyncLocalCacheDataChange
@@ -188,13 +164,13 @@ namespace MongoDB.Sync.Services
 
         }
 
-        public void Delete<T>(T item)
+        public void Delete<T>(T item) where T : BaseLocalCacheModel
         {
             if (item is null) throw new ArgumentNullException(nameof(item));
             var attribute = item.GetType().GetCustomAttribute<CollectionNameAttribute>();
             if (attribute is null) throw new InvalidOperationException("CollectionNameAttribute is missing");
             var collection = _db.GetCollection<T>(attribute.CollectionName);
-            var idValue = GetId(item);
+            var idValue = item.Id;
             if (idValue is null) return;
 
             // Does this record already exist in the collection? 

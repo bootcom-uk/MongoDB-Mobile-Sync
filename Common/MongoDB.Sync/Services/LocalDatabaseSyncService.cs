@@ -164,10 +164,15 @@ namespace MongoDB.Sync.Services
             // Insert/update document
             collection.Upsert(doc);
 
+            if(isDeleted is null)
+            {
+                isDeleted = new BsonValue(false);
+            }
+
             _messenger.Send(new DatabaseChangeMessage(new()
             {
                 ChangedItem = doc,
-                IsDeleted = isDeleted!.AsBoolean,
+                IsDeleted = isDeleted,
                 CollectionName = collectionName,
                 Id = docId.AsObjectId
             }));
@@ -206,10 +211,15 @@ namespace MongoDB.Sync.Services
                     // If the doc is marked as deleted, remove it from the local cache 
                    var deleted = collection.Delete(documentId);
 
+                    if (isDeleted is null)
+                    {
+                        isDeleted = new BsonValue(false);
+                    }
+
                     _messenger.Send(new DatabaseChangeMessage(new()
                     {
                         ChangedItem = null,
-                        IsDeleted = isDeleted!.AsBoolean,
+                        IsDeleted = isDeleted ,
                         CollectionName = collectionName,
                         Id = documentId
                     }));

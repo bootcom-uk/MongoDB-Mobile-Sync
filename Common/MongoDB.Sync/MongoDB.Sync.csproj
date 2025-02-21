@@ -12,14 +12,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.7" />
-	  <PackageReference Include="BootCom-MongoDB-Sync-Models" Version="1.0.24" />
+    <PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.8" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="LiteDB" Version="5.0.21" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.2" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.Reactive" Version="6.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MongoDB.Sync.Models\MongoDB.Sync.Models.csproj" />
   </ItemGroup>
 
 </Project>

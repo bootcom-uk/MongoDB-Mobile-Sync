@@ -8,15 +8,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BootCom-MongoDB-Sync-Models" Version="1.0.24" />
     <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="9.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Abstractions" Version="2.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.2" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.2" />
-    <PackageReference Include="MongoDB.Bson" Version="3.2.0" />
-    <PackageReference Include="MongoDB.Driver" Version="3.2.0" />
+    <PackageReference Include="MongoDB.Bson" Version="3.2.1" />
+    <PackageReference Include="MongoDB.Driver" Version="3.2.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MongoDB.Sync.Models\MongoDB.Sync.Models.csproj" />
   </ItemGroup>
 
 </Project>

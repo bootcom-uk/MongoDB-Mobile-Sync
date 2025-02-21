@@ -8,13 +8,6 @@ namespace MongoDB.Sync.Web.Models.SyncModels
     {
 
         /// <summary>
-        /// Specifies the unique identifier of the change
-        /// </summary>
-        [DatabaseFieldName("_id")]
-        public string Id { get; set; }
-
-
-        /// <summary>
         /// Where the action is not a deletion, this contains the document of changes
         /// </summary>
         public BsonDocument? Document { get; set; }
