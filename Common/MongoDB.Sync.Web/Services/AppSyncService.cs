@@ -71,6 +71,8 @@ namespace MongoDB.Sync.Web.Services
                 };
             }
 
+            webLocalCacheDataChange.Document = webLocalCacheDataChange.SerializedDocument.ToBsonDocument();
+
             // Filter allowed fields for insert/update
             var allowedFields = collectionMapping.Fields ?? new List<string>();
             var filteredDocument = new BsonDocument(
