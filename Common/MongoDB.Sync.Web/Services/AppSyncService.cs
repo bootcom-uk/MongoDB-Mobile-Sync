@@ -71,8 +71,6 @@ namespace MongoDB.Sync.Web.Services
                 };
             }
 
-            webLocalCacheDataChange.Document = webLocalCacheDataChange.SerializedDocument.ToBsonDocument();
-
             // Filter allowed fields for insert/update
             var allowedFields = collectionMapping.Fields ?? new List<string>();
             var filteredDocument = new BsonDocument(
@@ -81,17 +79,20 @@ namespace MongoDB.Sync.Web.Services
                     .ToDictionary(kvp => kvp.Name, kvp => kvp.Value)
             );
 
-            var filterById = Builders<BsonDocument>.Filter.Eq("_id", webLocalCacheDataChange.Id);
+            var filterById = Builders<BsonDocument>.Filter.Eq("_id", new ObjectId(webLocalCacheDataChange.Id));
             var existingRecord = await collection.Find(filterById).FirstOrDefaultAsync();
 
             if (existingRecord is null)
             {
                 // Insert new record with filtered fields
                 await collection.InsertOneAsync(filteredDocument);
+                return new()
+                {
+                    { "message", $"Successfully added record." }
+                };
             }
-            else
-            {
-                // Prepare an update definition with only changed fields
+            
+            // Prepare an update definition with only changed fields
                 var updateDefinitions = new List<UpdateDefinition<BsonDocument>>();
                 foreach (var field in allowedFields)
                 {
@@ -105,9 +106,18 @@ namespace MongoDB.Sync.Web.Services
                 {
                     var updateDefinition = Builders<BsonDocument>.Update.Combine(updateDefinitions);
                     await collection.UpdateOneAsync(filterById, updateDefinition);
-                }
+
+                return new()
+                {
+                    { "message", $"Successfully updated record." }
+                };
             }
-            return null;
+
+            return new()
+                {
+                    { "message", $"No fields to update." }
+                };
+
         }
 
 
