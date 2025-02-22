@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace MongoDB.Sync.Models
 {
     [CollectionName("LocalCacheDataChange")]
-    public abstract class LocalCacheDataChange
+    public class LocalCacheDataChange
     {
 
         /// <summary>
