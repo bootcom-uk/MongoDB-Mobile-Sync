@@ -84,11 +84,13 @@ namespace MongoDB.Sync.Services
                 }
                 
                 var localCacheDataChange = _changesToProcess.Peek();
-                if (localCacheDataChange != null)
+                if (localCacheDataChange.Document != null)
                 {
-                    localCacheDataChange.SerializedDocument = JsonSerializer.Serialize(localCacheDataChange.Document);
+                    string jsonString = LiteDB.JsonSerializer.Serialize(localCacheDataChange.Document);
+
+                    localCacheDataChange.SerializedDocument = jsonString;
                 }
-                
+
                 var builder = _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/Send/{_appName}"), HttpMethod.Post);
 
                 if(_preRequestAction != null)
