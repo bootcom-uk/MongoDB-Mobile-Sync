@@ -38,7 +38,7 @@ namespace MongoDB.Sync.LocalDataCache
 
         private void ReloadData()
         {
-            var query = _collection.FindAll().AsQueryable();
+            IQueryable<T> query = _collection.FindAll().AsQueryable();
 
             if (_filter != null)
             {
@@ -102,10 +102,31 @@ namespace MongoDB.Sync.LocalDataCache
                         
             if (_filter != null)
             {
-                if (tmpList.Where(_filter).Count() == 0) Remove(record);
+                if (tmpList.Where(_filter).Count() == 0)
+                {
+                    Remove(record);
+                    return;
+                }                
             }
 
+            ReapplySort();
         }
+
+        private void ReapplySort()
+        {
+            if (_order != null)
+            {
+                var sortedList = _order(this.AsQueryable()).ToList();
+
+                // 🔥 Refresh the UI by updating the collection
+                Clear();
+                foreach (var item in sortedList)
+                {
+                    Add(item);
+                }
+            }
+        }
+
     }
 
 

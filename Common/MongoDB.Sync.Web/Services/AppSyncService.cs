@@ -20,6 +20,30 @@ namespace MongoDB.Sync.Web.Services
             _logger = logger;
         }
 
+        public async Task<IEnumerable<AppSyncMapping>> GetAppSyncMappings()
+        {
+            var appCollection = _appServicesDb.GetCollection<AppSyncMapping>("SyncMappings");
+            return await appCollection.Find<AppSyncMapping>(a => true).ToListAsync();
+        }
+
+        public async Task SaveAppSyncMapping(AppSyncMapping appSyncMapping)
+        {
+            var appCollection = _appServicesDb.GetCollection<AppSyncMapping>("SyncMappings");
+
+            await appCollection.ReplaceOneAsync(
+                record => record.Id == appSyncMapping.Id,
+                appSyncMapping,
+                new ReplaceOptions { IsUpsert = true }
+            );
+        }
+
+        public async Task DeleteAppSyncMapping(string appId)
+        {
+            var appCollection = _appServicesDb.GetCollection<AppSyncMapping>("SyncMappings");
+
+            await appCollection.DeleteOneAsync(record => record.AppId == appId);
+        }
+
         public async Task<AppSyncMapping?> GetAppInformation(string appName)
         {
             var appCollection = _appServicesDb.GetCollection<AppSyncMapping>("SyncMappings");
@@ -194,5 +218,7 @@ namespace MongoDB.Sync.Web.Services
             // Convert each document to JSON string to avoid BsonDocument serialization issues
             return documents.Select(doc => doc.ToJson()).ToList();
         }
+
+        
     }
 }
