@@ -156,6 +156,8 @@ namespace MongoDB.Sync.Services
             var idValue = item.Id;
             if (idValue is null) return;
 
+            collection.Upsert(item);
+
             Enqueue(new SyncLocalCacheDataChange
             {
                 CollectionName = attribute.CollectionName,
@@ -180,6 +182,8 @@ namespace MongoDB.Sync.Services
 
             // Record doesn't exist so exit
             if (record is null) return;
+
+            collection.Delete(idValue);
 
             Enqueue(new SyncLocalCacheDataChange
             {

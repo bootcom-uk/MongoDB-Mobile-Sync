@@ -4,6 +4,13 @@ namespace MongoDB.Sync.Web.Interfaces
 {
     public interface IAppSyncService
     {
+
+        Task<IEnumerable<AppSyncMapping>> GetAppSyncMappings();
+
+        Task SaveAppSyncMapping(AppSyncMapping appSyncMapping);
+
+        Task DeleteAppSyncMapping(string appId);
+
         bool UserHasPermission(string appId, string userId);
 
         Task<Dictionary<string, string>?> WriteDataToMongo(string appName, WebLocalCacheDataChange webLocalCacheDataChange);

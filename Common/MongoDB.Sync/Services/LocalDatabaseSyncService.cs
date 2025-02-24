@@ -1,11 +1,7 @@
-﻿using CommunityToolkit.Mvvm.DependencyInjection;
-using CommunityToolkit.Mvvm.Messaging;
+﻿using CommunityToolkit.Mvvm.Messaging;
 using LiteDB;
-using MongoDB.Sync.LocalDataCache;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
-using System;
-using System.Collections;
 
 namespace MongoDB.Sync.Services
 {
@@ -158,6 +154,13 @@ namespace MongoDB.Sync.Services
             if (isDeleted != null && isDeleted.AsBoolean)
             {
                 collection.Delete(docId);
+                _messenger.Send(new DatabaseChangeMessage(new()
+                {
+                    ChangedItem = doc,
+                    IsDeleted = isDeleted,
+                    CollectionName = collectionName,
+                    Id = docId.AsObjectId
+                }));
                 return;
             }
 
@@ -188,21 +191,20 @@ namespace MongoDB.Sync.Services
                 var updateData = System.Text.Json.JsonSerializer.Deserialize<PayloadModel>(message.Value);
                 if (updateData is null || updateData.Document is null) return;
 
-                var updateDoc = LiteDB.JsonSerializer.Deserialize(updateData.Document.ToString()).AsDocument;
+                String docJson = Convert.ToString(updateData.Document)!;
+
+                var updateDoc = MongoJsonConverter.ConvertMongoJsonToLiteDB(docJson);
+
                 if (updateDoc is null) return;
 
                 var collectionName = $"{updateData.Database}_{updateData.Collection}".Replace("-", "_");
                 var collection = LiteDb.GetCollection(collectionName);
 
-                ObjectId? documentId = null; 
-
                 // If the document doesn't contain an ID, we can't do anything with it
-                if (!updateDoc.TryGetValue("_id", out var docId))
+                if (!updateDoc.TryGetValue("_id", out var documentId))
                 {                                        
                     return;
                 }
-
-                documentId = new ObjectId(docId.AsString);
 
                 // Check if the update document contains metadata for deletion
                 if (updateDoc.TryGetValue("deleted", out var isDeleted) && isDeleted.AsBoolean)
@@ -228,7 +230,7 @@ namespace MongoDB.Sync.Services
                 }
 
                 // Try to fetch the existing document from LiteDB
-                var existingDoc = collection.FindById(documentId);
+                var existingDoc = collection.FindOne(record => record["_id"].AsObjectId == documentId.AsObjectId);
                 if (existingDoc != null)
                 {
                     // Merge the update into the existing document
@@ -249,7 +251,7 @@ namespace MongoDB.Sync.Services
                     collection.Insert(updateDoc);
 
                     // Update the last processed ID
-                    SetLastId(updateData.Database, updateData.Collection, docId.AsObjectId);
+                    SetLastId(updateData.Database, updateData.Collection, documentId.AsObjectId);
 
                 }
 
