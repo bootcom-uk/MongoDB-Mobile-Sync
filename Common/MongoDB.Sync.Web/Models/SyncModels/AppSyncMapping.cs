@@ -20,6 +20,9 @@ namespace MongoDB.Sync.Web.Models.SyncModels
         [BsonElement("appName")]
         public required string AppName { get; set; }
 
+        [BsonElement("appDescription")]
+        public string AppDescription { get; set; }
+
         [BsonElement("appId")]
         public required string AppId { get; set; }
 
