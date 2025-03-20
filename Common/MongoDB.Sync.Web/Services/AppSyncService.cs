@@ -76,7 +76,6 @@ namespace MongoDB.Sync.Web.Services
             {
                 appSyncMapping.Version += 1;
                 appSyncMapping.HasInitialSyncComplete = false;
-                await _initialSyncService.PerformInitialSync(appSyncMapping.AppName);
             }
 
             await appCollection.ReplaceOneAsync(
@@ -84,6 +83,11 @@ namespace MongoDB.Sync.Web.Services
                 appSyncMapping,
                 new ReplaceOptions { IsUpsert = true }
             );
+
+            if (hasVersionChanged)
+            {
+                await _initialSyncService.PerformInitialSync(appSyncMapping.AppName, existingMapping);
+            }
         }
 
         public async Task DeleteAppSyncMapping(string appId)
