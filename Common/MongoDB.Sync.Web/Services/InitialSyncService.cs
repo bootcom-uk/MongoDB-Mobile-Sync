@@ -31,7 +31,7 @@ namespace MongoDB.Sync.Web.Services
             return appMapping.HasInitialSyncComplete;
         }
 
-        public async Task<bool> PerformInitialSync(string appName)
+        public async Task<bool> PerformInitialSync(string appName, AppSyncMapping? originalMapping)
         {
             var appCollection = _appServicesDb.GetCollection<AppSyncMapping>("SyncMappings");
 
@@ -52,6 +52,17 @@ namespace MongoDB.Sync.Web.Services
             // Sync each collection defined in the app's mapping
             foreach (var collectionMapping in appMapping.Collections)
             {
+                // Check if the collection mapping has been updated since the last sync, if it has then perform a full sync
+                if (originalMapping != null)
+                {
+                   var originalMappingCollection = originalMapping.Collections.FirstOrDefault(c => c.CollectionName == collectionMapping.CollectionName);
+                    if(originalMappingCollection != null && originalMappingCollection.Version != collectionMapping.Version)
+                    {
+                        // Collection details not updated so let's now move to the next collection
+                        continue;
+                    }
+                }
+
                 bool success = await SyncCollection(appMapping, collectionMapping);
                 if (!success)
                 {
@@ -81,13 +92,15 @@ namespace MongoDB.Sync.Web.Services
             var targetDb = _appServicesDb.Client.GetDatabase("AppServices");
             var targetCollectionName = $"{appMapping.AppId}_{collectionName}";
 
-            // Check if target collection exists and create if not
+            // Check if target collection exists - if it does, drop it 
             var existingCollections = await targetDb.ListCollectionNames().ToListAsync();
-            if (!existingCollections.Contains(targetCollectionName))
+            if (existingCollections.Contains(targetCollectionName))
             {
-                await targetDb.CreateCollectionAsync(targetCollectionName);
-                _logger.LogInformation($"Created collection {targetCollectionName} in AppServices database.");
+                await targetDb.DropCollectionAsync(targetCollectionName);                
             }
+
+            await targetDb.CreateCollectionAsync(targetCollectionName);
+            _logger.LogInformation($"Created collection {targetCollectionName} in AppServices database.");
 
             var targetCollection = targetDb.GetCollection<BsonDocument>(targetCollectionName);
 
