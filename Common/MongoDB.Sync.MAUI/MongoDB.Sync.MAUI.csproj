@@ -20,8 +20,8 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.9" />
-		<PackageReference Include="BootCom-MongoDB-Sync" Version="1.1.60" />	
+		<PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.11" />
+		<PackageReference Include="BootCom-MongoDB-Sync" Version="1.1.63" />	
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.3.0" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.50" />
