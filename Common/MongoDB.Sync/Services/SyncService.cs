@@ -302,7 +302,8 @@ namespace MongoDB.Sync.Services
 
             if (response is null) throw new NullReferenceException("The request failed and returned no response");
 
-            return response.Result;
+            var appSyncMapping = response.Result;
+            return appSyncMapping;
 
         }
 
