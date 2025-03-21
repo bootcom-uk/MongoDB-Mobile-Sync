@@ -7,7 +7,7 @@ namespace MongoDB.Sync.Web.Interfaces
 
         Task<IEnumerable<AppSyncMapping>> GetAppSyncMappings();
 
-        Task SaveAppSyncMapping(AppSyncMapping appSyncMapping);
+        Task<AppSyncMapping?> SaveAppSyncMapping(AppSyncMapping appSyncMapping);
 
         Task DeleteAppSyncMapping(string appId);
 

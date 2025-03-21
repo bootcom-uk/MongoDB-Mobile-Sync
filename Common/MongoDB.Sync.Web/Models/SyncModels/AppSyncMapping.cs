@@ -34,5 +34,7 @@ namespace MongoDB.Sync.Web.Models.SyncModels
 
         [BsonElement("hasInitialSyncComplete")]
         public bool HasInitialSyncComplete { get; set; }  // Flag for initial sync completion
+
+        public DateTime LastChecked { get; set; }
     }
 }

@@ -30,7 +30,7 @@ namespace MongoDB.Sync.Web.Services
             return await appCollection.Find<AppSyncMapping>(a => true).ToListAsync();
         }
 
-        public async Task SaveAppSyncMapping(AppSyncMapping appSyncMapping)
+        public async Task<AppSyncMapping?> SaveAppSyncMapping(AppSyncMapping appSyncMapping)
         {
             var appCollection = _appServicesDb.GetCollection<AppSyncMapping>("SyncMappings");
 
@@ -84,10 +84,12 @@ namespace MongoDB.Sync.Web.Services
                 new ReplaceOptions { IsUpsert = true }
             );
 
-            if (hasVersionChanged)
+            if (!hasVersionChanged)
             {
-                await _initialSyncService.PerformInitialSync(appSyncMapping.AppName, existingMapping);
+                return null;                
             }
+
+            return appSyncMapping;            
         }
 
         public async Task DeleteAppSyncMapping(string appId)
@@ -111,7 +113,7 @@ namespace MongoDB.Sync.Web.Services
             {
                 return null;
             }
-
+            
             return appMapping;
         }
 
