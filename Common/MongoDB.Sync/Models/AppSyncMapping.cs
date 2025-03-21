@@ -28,5 +28,8 @@ namespace MongoDB.Sync.Models
 
         [ObservableProperty]
         bool initialSyncComplete;
+
+        [ObservableProperty]
+        DateTime? lastChecked;
     }
 }

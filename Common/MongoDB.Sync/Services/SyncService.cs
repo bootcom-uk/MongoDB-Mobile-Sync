@@ -49,6 +49,35 @@ namespace MongoDB.Sync.Services
         }
 
 
+        private async Task HandleAppSchemaUpdate(string jsonSchema) {
+            var newSchema = JsonSerializer.Deserialize<AppSyncMapping>(jsonSchema);
+
+            // If the schema is null then we can't do anything
+            if (newSchema == null)
+            {
+                return;
+            }
+
+            // If the schema version is the same as the current version then we don't need to do anything
+            if (newSchema.Version == _appDetails!.Version)
+            {
+                return;
+            }
+
+            foreach (var collection in newSchema.Collections)
+            {
+                if(collection.Version != _appDetails!.Collections.FirstOrDefault(c => c.CollectionName == collection.CollectionName)?.Version)
+                {
+
+                    _localDatabaseService.ClearCollection($"{collection.DatabaseName}_{collection.CollectionName}".Replace("-", "_"));
+                    await ProcessCollectionUpdate(collection);
+                  
+                }
+            }
+
+            AppSyncInProgress = false;
+        }
+
         private void HandleRealtimeUpdate(string jsonData)
         {
             
@@ -68,6 +97,72 @@ namespace MongoDB.Sync.Services
 
         private AppSyncMapping? _appDetails;
 
+        public bool AppSyncInProgress { get; set; } = false;
+
+        public async Task ProcessCollectionUpdate(CollectionMapping item)
+        {
+            var dataSyncResult = (null as SyncResult);
+            var pageNumber = 1;
+
+            while (dataSyncResult == null || (dataSyncResult != null && dataSyncResult.Data!.Count > 0))
+            {
+                Console.WriteLine($"Syncing {item.DatabaseName}.{item.CollectionName} Page {pageNumber}");
+
+                var builder = _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/sync"), HttpMethod.Post);
+                var formContent = new Dictionary<string, string>()
+                    {
+                        { "AppName", _appName },
+                        { "DatabaseName", item.DatabaseName },
+                        { "CollectionName", item.CollectionName },
+                        { "PageNumber", pageNumber.ToString() }
+                    };
+
+
+
+                if (_appDetails.InitialSyncComplete)
+                {
+                    var lastSyncDate = _localDatabaseService.GetLastSyncDateTime(item.DatabaseName, item.CollectionName);
+                    Console.WriteLine($"Checking last sync date time for database: {item.DatabaseName} collection: {item.CollectionName}. Last date is: {lastSyncDate}");
+                    if (lastSyncDate != null) formContent.Add("LastSyncDate", $"{lastSyncDate?.ToString("O")}");
+                }
+                else
+                {
+                    var lastSyncedId = _localDatabaseService.GetLastId(item.DatabaseName, item.CollectionName);
+                    if (lastSyncedId != null) formContent.Add("LastSyncedId", lastSyncedId!.ToString());
+                }
+
+                builder.WithFormContent(formContent);
+
+                if (_preRequestAction != null) builder.PreRequest(_preRequestAction);
+
+                if (_statusCheckAction != null) builder.OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction);
+
+                var response = await builder
+                    .WithRetry(3)
+                    .SendAsync<SyncResult>();
+
+                if (response is null || !response.Success) break;
+
+                dataSyncResult = response.Result;
+
+                foreach (var rawDoc in response.Result!.Data)
+                {
+
+                    var updatedData = new UpdatedData()
+                    {
+                        Database = item.DatabaseName,
+                        CollectionName = item.CollectionName,
+                        Document = rawDoc
+                    };
+
+                    _messenger.Send<APISyncMessageReceived>(new APISyncMessageReceived(JsonSerializer.Serialize(updatedData)));
+                }
+
+                pageNumber++;
+
+            }
+        }
+
         private async Task PerformAPISync()
         {
 
@@ -77,67 +172,7 @@ namespace MongoDB.Sync.Services
 
             // Loop through each collection stored
             foreach (var item in _appDetails!.Collections) {
-
-                var dataSyncResult = (null as SyncResult);
-                var pageNumber = 1;
-                
-                while (dataSyncResult == null || (dataSyncResult != null && dataSyncResult.Data!.Count > 0))
-                {
-                    Console.WriteLine($"Syncing {item.DatabaseName}.{item.CollectionName} Page {pageNumber}");
-
-                    var builder = _httpService.CreateBuilder(new Uri($"{_apiUrl}/api/DataSync/sync"), HttpMethod.Post);
-                    var formContent = new Dictionary<string, string>()
-                    {
-                        { "AppName", _appName },
-                        { "DatabaseName", item.DatabaseName },
-                        { "CollectionName", item.CollectionName },
-                        { "PageNumber", pageNumber.ToString() }
-                    };
-
-                    
-
-                    if (_appDetails.InitialSyncComplete)
-                    {                        
-                        var lastSyncDate = _localDatabaseService.GetLastSyncDateTime(item.DatabaseName, item.CollectionName);
-                        Console.WriteLine($"Checking last sync date time for database: {item.DatabaseName} collection: {item.CollectionName}. Last date is: {lastSyncDate}");
-                        if (lastSyncDate != null) formContent.Add("LastSyncDate", $"{lastSyncDate?.ToString("O")}");
-                    } else
-                    {
-                        var lastSyncedId = _localDatabaseService.GetLastId(item.DatabaseName, item.CollectionName);
-                        if (lastSyncedId != null) formContent.Add("LastSyncedId", lastSyncedId!.ToString());
-                    }
-
-                    builder.WithFormContent(formContent);
-
-                    if(_preRequestAction != null) builder.PreRequest(_preRequestAction);
-
-                    if(_statusCheckAction != null) builder.OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction);
-
-                    var response = await builder                        
-                        .WithRetry(3)
-                        .SendAsync<SyncResult>();
-
-                    if (response is null || !response.Success) break;
-
-                    dataSyncResult = response.Result;
-
-                    foreach (var rawDoc in response.Result!.Data)
-                    {
-
-                        var updatedData = new UpdatedData()
-                        {
-                            Database = item.DatabaseName,
-                            CollectionName = item.CollectionName,
-                            Document = rawDoc
-                        };
-
-                        _messenger.Send<APISyncMessageReceived>(new APISyncMessageReceived(JsonSerializer.Serialize(updatedData)));
-                    }
-
-                    pageNumber++;
-
-                }
-
+                await ProcessCollectionUpdate(item);
             }
 
             _localDatabaseService.InitialSyncComplete();
@@ -194,6 +229,8 @@ namespace MongoDB.Sync.Services
 
             // Set up handler for receiving real-time updates
             _hubConnection.On<string>("ReceiveUpdate", HandleRealtimeUpdate);
+            _hubConnection.On("AppSyncStarted", () => AppSyncInProgress = true);
+            _hubConnection.On<string>("AppSyncComplete", HandleAppSchemaUpdate);
 
             _syncIsStarting = false;
         }

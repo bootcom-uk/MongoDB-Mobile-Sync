@@ -38,6 +38,11 @@ namespace MongoDB.Sync.Services
             }
         }
 
+        public void ClearCollection(string collectionName)
+        {
+            LiteDb.DropCollection(collectionName);
+        }
+
         public AppSyncMapping GetAppMapping()
         {
             var appsCollection = LiteDb.GetCollection<AppSyncMapping>("AppMappings");
@@ -71,14 +76,18 @@ namespace MongoDB.Sync.Services
 
                 appsCollection = LiteDb.GetCollection<AppSyncMapping>("AppMappings");
 
-                appsCollection.Insert(mapping);
+                appsCollection.Upsert(mapping);
 
                 return;
             }
 
             // If we have our mappings but we haven't updated the app in a 
             // set amount of time then we need to regenerate the cache
-            // if(appRecord.FullRefreshIfNoActivityInDays == last
+             if(appRecord != null && appRecord.LastChecked != null && mapping.LastChecked!.Value.Subtract(appRecord.LastChecked.Value).Days > mapping.FullRefreshIfNoActivityInDays)
+            {
+                // Where we haven't sync'd data in a while then we need to clear out the cache
+                ClearLocalCache(this, new ClearLocalCacheMessage(false));
+            }
 
         }
 
