@@ -1,10 +1,15 @@
 ﻿using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Sync.Web.Converters;
+using System.Text.Json.Serialization;
 
 namespace MongoDB.Sync.Web.Models.SyncModels
 {
     public class AppSyncMapping
     {
+        [JsonConverter(typeof(ObjectIdConverter))]
+        [BsonRepresentation(BsonType.ObjectId)]
+        [BsonId]
         [BsonElement("_id")]
         public ObjectId Id { get; set; }
 
