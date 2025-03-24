@@ -15,13 +15,13 @@ namespace MongoDB.Sync.Web.Models
         public CustomId(ObjectId objectId)
         {
             Timestamp = objectId.Timestamp;
-            CreationTime = objectId.CreationTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
+            CreationTime = objectId.CreationTime.ToUniversalTime().ToString("o"); // Ensures consistency
         }
 
         public override string ToString()
         {
             return JsonSerializer.Serialize(this);
         }
-
     }
+
 }
