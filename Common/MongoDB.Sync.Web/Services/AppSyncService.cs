@@ -37,11 +37,11 @@ namespace MongoDB.Sync.Web.Services
             var hasVersionChanged = false;
 
             // Have our mappings been modified? 
-            var existingMapping = await appCollection.Find(a => a.AppId == appSyncMapping.AppId).FirstOrDefaultAsync();
+            var existingMapping = await appCollection.Find(a => a.Id == appSyncMapping.Id).FirstOrDefaultAsync();
                       
             foreach (var item in appSyncMapping.Collections)
             {
-                var existingCollection = existingMapping?.Collections.FirstOrDefault(c => c.CollectionName == item.CollectionName);
+                var existingCollection = existingMapping?.Collections.FirstOrDefault(c => c.CollectionName == item.CollectionName && c.DatabaseName == item.DatabaseName);
 
                 // Is this a new collection - if so then set the version to 1
                 if (existingCollection is null)
