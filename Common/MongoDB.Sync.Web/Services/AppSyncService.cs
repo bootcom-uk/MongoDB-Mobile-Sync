@@ -43,6 +43,8 @@ namespace MongoDB.Sync.Web.Services
             var existingCollectionsJson = JsonSerializer.Serialize(existingMapping?.Collections);
             var newCollectionsJson = JsonSerializer.Serialize(appSyncMapping.Collections);
 
+            _logger.LogDebug("Existing Collections: {existingCollectionsJson}\nNew Collections: {newCollectionsJson}", existingCollectionsJson, newCollectionsJson);
+
             // If the collections have been modified, we need to compare both lists
             if (newCollectionsJson != existingCollectionsJson)
             {
