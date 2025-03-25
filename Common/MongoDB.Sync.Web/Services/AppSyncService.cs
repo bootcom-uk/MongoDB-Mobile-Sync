@@ -38,40 +38,30 @@ namespace MongoDB.Sync.Web.Services
 
             // Have our mappings been modified? 
             var existingMapping = await appCollection.Find(a => a.AppId == appSyncMapping.AppId).FirstOrDefaultAsync();
-
-            // Store the collections into json 
-            var existingCollectionsJson = JsonSerializer.Serialize(existingMapping?.Collections);
-            var newCollectionsJson = JsonSerializer.Serialize(appSyncMapping.Collections);
-
-            _logger.LogDebug("Existing Collections: {existingCollectionsJson}\nNew Collections: {newCollectionsJson}", existingCollectionsJson, newCollectionsJson);
-
-            // If the collections have been modified, we need to compare both lists
-            if (newCollectionsJson != existingCollectionsJson)
+                      
+            foreach (var item in appSyncMapping.Collections)
             {
-                foreach (var item in appSyncMapping.Collections)
+                var existingCollection = existingMapping?.Collections.FirstOrDefault(c => c.CollectionName == item.CollectionName);
+
+                // Is this a new collection - if so then set the version to 1
+                if (existingCollection is null)
                 {
-                    var existingCollection = existingMapping?.Collections.FirstOrDefault(c => c.CollectionName == item.CollectionName);
-
-                    // Is this a new collection - if so then set the version to 1
-                    if (existingCollection is null)
-                    {
-                        hasVersionChanged = true;
-                        item.Version = 1;
-                        continue;
-                    }
-
-                    IEnumerable<string> inFirstOnly = existingCollection.Fields!.Except(item.Fields!);
-                    IEnumerable<string> inSecondOnly = item.Fields!.Except(existingCollection.Fields!);
-                    var listsDiffer = !inFirstOnly.Any() && !inSecondOnly.Any();
-
-                    // Existing collection where the fields have changed so increment the version
-                    if (listsDiffer)
-                    {
-                        hasVersionChanged = true;
-                        item.Version += 1;
-                    }
-
+                    hasVersionChanged = true;
+                    item.Version = 1;
+                    continue;
                 }
+
+                IEnumerable<string> inFirstOnly = existingCollection.Fields!.Except(item.Fields!);
+                IEnumerable<string> inSecondOnly = item.Fields!.Except(existingCollection.Fields!);
+                var listsDiffer = !inFirstOnly.Any() && !inSecondOnly.Any();
+
+                // Existing collection where the fields have changed so increment the version
+                if (listsDiffer)
+                {
+                    hasVersionChanged = true;
+                    item.Version += 1;
+                }
+
             }
 
             if(hasVersionChanged)
