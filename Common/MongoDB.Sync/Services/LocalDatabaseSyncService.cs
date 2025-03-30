@@ -83,7 +83,7 @@ namespace MongoDB.Sync.Services
 
             // If we have our mappings but we haven't updated the app in a 
             // set amount of time then we need to regenerate the cache
-             if(appRecord != null && appRecord.LastChecked != null && mapping.LastChecked!.Value.Subtract(appRecord.LastChecked.Value).Days > mapping.FullRefreshIfNoActivityInDays)
+             if(appRecord != null && appRecord.ServerDateTime != null && mapping.ServerDateTime!.Value.Subtract(appRecord.ServerDateTime.Value).Days > mapping.FullRefreshIfNoActivityInDays)
             {
                 // Where we haven't sync'd data in a while then we need to clear out the cache
                 ClearLocalCache(this, new ClearLocalCacheMessage(false));
