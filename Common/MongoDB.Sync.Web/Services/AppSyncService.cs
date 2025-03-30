@@ -53,7 +53,11 @@ namespace MongoDB.Sync.Web.Services
 
                 IEnumerable<string> inFirstOnly = existingCollection.Fields!.Except(item.Fields!);
                 IEnumerable<string> inSecondOnly = item.Fields!.Except(existingCollection.Fields!);
-                var listsDiffer = !inFirstOnly.Any() && !inSecondOnly.Any();
+
+                var firstListCount = inFirstOnly.Count();
+                var secondListCount = inSecondOnly.Count();
+
+                var listsDiffer = firstListCount > 0 || secondListCount > 0;
 
                 // Existing collection where the fields have changed so increment the version
                 if (listsDiffer)
