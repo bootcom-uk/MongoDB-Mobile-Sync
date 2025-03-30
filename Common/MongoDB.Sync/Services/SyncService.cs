@@ -341,7 +341,7 @@ namespace MongoDB.Sync.Services
 
             var appSyncMapping = response.Result;
 
-            // appSyncMapping.ServerDateTime = response.Headers["ServerDateTime"] ?? DateTime.UtcNow.ToString("O");
+            //appSyncMapping.ServerDateTime = response.Headers["ServerDateTime"] ?? DateTime.UtcNow.ToString("O");
 
             return appSyncMapping;
 
