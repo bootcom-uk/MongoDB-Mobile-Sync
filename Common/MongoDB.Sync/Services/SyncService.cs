@@ -341,7 +341,7 @@ namespace MongoDB.Sync.Services
 
             var appSyncMapping = response.Result;
 
-            if (response.Headers!["ServerDateTime"] != null)
+            if (response?.Headers?["ServerDateTime"] != null)
             {
                 appSyncMapping!.ServerDateTime = DateTime.Parse(response.Headers["ServerDateTime"]);
             }
