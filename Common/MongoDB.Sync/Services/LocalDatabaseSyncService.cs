@@ -2,6 +2,7 @@
 using LiteDB;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
+using System.Collections;
 
 namespace MongoDB.Sync.Services
 {
@@ -70,9 +71,19 @@ namespace MongoDB.Sync.Services
             // record and the new one.
             if(appRecord.Version != mapping.Version)
             {
-                // Where the mapping version has been modified this means we need to clear out 
-                // our entire cache and rebuild
-                ClearLocalCache(this, new ClearLocalCacheMessage(false));
+
+                // The mapping version has been updated so we need to see whether any of the collections have updated
+                foreach (var collection in appRecord.Collections)
+                {
+                    var newCollection = mapping.Collections.FirstOrDefault(x => x.DatabaseName == collection.DatabaseName && x.CollectionName == collection.CollectionName);
+
+                    // This collection doesn't exist in the new mapping or the version is different. Either way
+                    // we need to remove the collection from the local cache
+                    if (newCollection == null || collection.Version != newCollection.Version)
+                    {
+                        LiteDb.DropCollection(collection.CollectionName);
+                    }
+                }
 
                 appsCollection = LiteDb.GetCollection<AppSyncMapping>("AppMappings");
 
