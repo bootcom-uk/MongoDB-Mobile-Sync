@@ -40,7 +40,7 @@ namespace MongoDB.Sync.Web.Models.SyncModels
         [BsonElement("hasInitialSyncComplete")]
         public bool HasInitialSyncComplete { get; set; }  // Flag for initial sync completion
 
-        [BsonIgnore]
+        [BsonIgnore]        
         public DateTime ServerDateTime { get; set; }
     }
 }

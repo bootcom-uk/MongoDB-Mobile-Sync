@@ -63,12 +63,8 @@ namespace MongoDB.Sync.Web.Services
                     }
                 }
 
-                bool success = await SyncCollection(appMapping, collectionMapping);
-                if (!success)
-                {
-                    _logger.LogError($"Failed to sync collection {collectionMapping.CollectionName} for app {appName}.");
-                    return false;
-                }
+                await SyncCollection(appMapping, collectionMapping);
+                
             }
 
             // After successful sync of all collections, set flag to true
@@ -79,7 +75,7 @@ namespace MongoDB.Sync.Web.Services
             return true;
         }
 
-        private async Task<bool> SyncCollection(AppSyncMapping appMapping, CollectionMapping collectionMapping)
+        private async Task SyncCollection(AppSyncMapping appMapping, CollectionMapping collectionMapping)
         {
             var collectionName = collectionMapping.CollectionName;
             var dbName = collectionMapping.DatabaseName;
@@ -148,7 +144,7 @@ namespace MongoDB.Sync.Web.Services
             }
 
             _logger.LogInformation($"Sync completed for collection {collectionName} in database {dbName}.");
-            return true;
+            
         }
 
     }

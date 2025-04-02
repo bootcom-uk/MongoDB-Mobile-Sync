@@ -1,16 +1,18 @@
-﻿using System.Net.Http.Json;
-using System.Net.Mime;
-using System.Security.Principal;
-using System.Text;
-using System.Xml.Linq;
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
 using LiteDB;
 using Microsoft.AspNetCore.SignalR.Client;
+using MongoDB.Sync.Converters;
 using MongoDB.Sync.Interfaces;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using Services;
+using System.Net.Http.Json;
+using System.Net.Mime;
+using System.Security.Principal;
+using System.Text;
+using System.Text.Json;
+using System.Xml.Linq;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace MongoDB.Sync.Services
@@ -35,6 +37,12 @@ namespace MongoDB.Sync.Services
         public readonly LocalDatabaseSyncService _localDatabaseService;
 
         public event EventHandler<UpdatedData>? OnDataUpdated;
+
+        private JsonSerializerOptions _serializationOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new ObjectIdConverter() }
+        };
 
         public SyncService(LocalDatabaseSyncService localDatabaseService, HttpService httpService, IMessenger messenger, NetworkStateService networkStateService, string apiUrl, string appName, Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction)
         {
@@ -139,7 +147,7 @@ namespace MongoDB.Sync.Services
 
                 var response = await builder
                     .WithRetry(3)
-                    .SendAsync<SyncResult>();
+                    .SendAsync<SyncResult>(_serializationOptions);
 
                 if (response is null || !response.Success) break;
 
@@ -335,9 +343,11 @@ namespace MongoDB.Sync.Services
                     { "AppName", _appName }
                 })                
                 .WithRetry(3)
-                .SendAsync<AppSyncMapping>();
+                .SendAsync<AppSyncMapping>(_serializationOptions);
 
             if (response is null) throw new NullReferenceException("The request failed and returned no response");
+
+            if(response.Success == false) throw new Exception(response.Exception);
 
             var appSyncMapping = response.Result;
 
