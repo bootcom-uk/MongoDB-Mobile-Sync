@@ -1,9 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using LiteDB;
+using MongoDB.Sync.Converters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace MongoDB.Sync.Models
@@ -11,6 +13,7 @@ namespace MongoDB.Sync.Models
     public partial class AppSyncMapping : ObservableObject
     {
 
+        [JsonConverter(typeof(ObjectIdConverter))]
         [ObservableProperty]
         ObjectId id = ObjectId.Empty;
 
