@@ -2,6 +2,7 @@
 using LiteDB;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
+using MongoDB.Sync.Models.Attributes;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -31,8 +32,6 @@ namespace MongoDB.Sync.LocalDataCache
             _collection = _db.GetCollection<T>(collectionName);
             _filter = filter;
             _order = order;
-
-            ApplyReferenceMappings(_db);
 
             // Load Initial Data
             ReloadData();
@@ -118,50 +117,6 @@ namespace MongoDB.Sync.LocalDataCache
             }
         }
 
-        private void ApplyReferenceMappings(LiteDatabase db)
-        {
-            var type = typeof(T);
-
-            if (_mappedTypes.Contains(type))
-                return;
-
-            lock (_mappedTypes)
-            {
-                if (_mappedTypes.Contains(type))
-                    return;
-
-                var entityBuilder = BsonMapper.Global.Entity<T>();
-
-                var props = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-                foreach (var prop in props)
-                {
-                    if (!typeof(BaseLocalCacheModel).IsAssignableFrom(prop.PropertyType))
-                        continue;
-
-                    var collectionAttr = prop.PropertyType.GetCustomAttribute<CollectionNameAttribute>();
-                    if (collectionAttr == null)
-                        continue;
-
-                    entityBuilder.Field(prop.Name,
-                        // Serialize
-                        (obj) =>
-                        {
-                            var refObj = prop.GetValue(obj) as BaseLocalCacheModel;
-                            return refObj?.Id;
-                        },
-                        // Deserialize
-                        (obj, bsonVal) =>
-                        {
-                            var refCollection = db.GetCollection(prop.PropertyType, collectionAttr.Name);
-                            var resolved = refCollection.FindById(bsonVal);
-                            prop.SetValue(obj, resolved);
-                        });
-                }
-
-                _mappedTypes.Add(type);
-            }
-        }
     }
 
 
