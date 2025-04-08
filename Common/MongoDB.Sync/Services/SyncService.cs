@@ -126,8 +126,7 @@ namespace MongoDB.Sync.Services
                     };
 
 
-
-                if (_appDetails.InitialSyncComplete)
+                if (_appDetails!.InitialSyncComplete)
                 {
                     var lastSyncDate = _localDatabaseService.GetLastSyncDateTime(item.DatabaseName, item.CollectionName);
                     Console.WriteLine($"Checking last sync date time for database: {item.DatabaseName} collection: {item.CollectionName}. Last date is: {lastSyncDate}");
