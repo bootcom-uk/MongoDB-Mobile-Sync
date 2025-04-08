@@ -19,7 +19,6 @@ namespace MongoDB.Sync.Services
 
         public LocalDatabaseSyncService(IMessenger messenger, string liteDbPath) {
             LiteDb = new LiteDatabase(liteDbPath);
-            InitializeReferenceResolvers();
             _messenger = messenger;
 
             _messenger.Register<RealtimeUpdateReceivedMessage>(this, HandleRealtimeUpdate);
@@ -29,40 +28,7 @@ namespace MongoDB.Sync.Services
 
         }
 
-        private void InitializeReferenceResolvers()
-        {
-            var mapper = BsonMapper.Global;
-
-            var assemblies = new List<Assembly>();
-            assemblies.AddRange(AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location)));
-
-            var allTypes = assemblies
-                .SelectMany(a => a.GetTypes())
-                .Where(t =>
-                    t.IsClass &&
-                    typeof(BaseLocalCacheModel).IsAssignableFrom(t) &&
-                    t.GetCustomAttribute<CollectionNameAttribute>() != null);
-
-            foreach (var refType in allTypes)
-            {
-                var collectionName = refType.GetCustomAttribute<CollectionNameAttribute>()!.CollectionName;
-
-                // Register converter for this reference type
-                mapper.RegisterType(
-                    serialize: (obj) =>
-                    {
-                        var idProp = typeof(BaseLocalCacheModel).GetProperty("Id");
-                        var id = (ObjectId)idProp!.GetValue(obj);
-                        return new BsonValue(id);
-                    },
-                    deserialize: (bson) =>
-                    {
-                        var collection = LiteDb.GetCollection(collectionName);
-                        return collection.FindById(bson.AsObjectId);
-                    });
-            }
-        }
+        
 
         private void ClearLocalCache(object recipient, ClearLocalCacheMessage message)
         {
