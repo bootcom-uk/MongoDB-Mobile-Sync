@@ -72,6 +72,11 @@ namespace MongoDB.Sync.LocalDataCache
             }
         }
 
+        public void Refresh()
+        {
+            ReloadData();
+        }
+
         private void ReloadData()
         {
 
@@ -207,12 +212,12 @@ namespace MongoDB.Sync.LocalDataCache
             }
         }
 
-        public void BeginUpdate()
+        private void BeginUpdate()
         {
             _suspendNotifications = true;
         }
 
-        public void EndUpdate()
+        private void EndUpdate()
         {
             _suspendNotifications =false;
             try
@@ -246,12 +251,12 @@ namespace MongoDB.Sync.LocalDataCache
             base.ClearItems();
         }
 
-        public void BeginBatchUpdate()
+        private void BeginBatchUpdate()
         {
             _suspendNotifications = true;
         }
 
-        public void EndBatchUpdate()
+        private void EndBatchUpdate()
         {
             _suspendNotifications = false;
             ReapplySort(); // Apply any sorting now that the batch is done
