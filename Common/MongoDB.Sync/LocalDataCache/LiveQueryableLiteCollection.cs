@@ -1,11 +1,14 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using LiteDB;
+using MongoDB.Sync.EventHandlers;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Reflection;
@@ -15,6 +18,9 @@ namespace MongoDB.Sync.LocalDataCache
 
     public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : BaseLocalCacheModel
     {
+
+        public event EventHandler<ItemChangedEventArgs<T>>? ItemChanged;
+
         private readonly LiteDatabase _db;
         private readonly ILiteCollection<T> _collection;
         private Func<T, bool>? _filter;
@@ -45,8 +51,25 @@ namespace MongoDB.Sync.LocalDataCache
             // Load Initial Data
             ReloadData();
 
+            this.CollectionChanged += LiveQueryableLiteCollection_CollectionChanged;
+
             // Listen for messages instead of LiteDBChangeNotifier
             WeakReferenceMessenger.Default.Register<DatabaseChangeMessage>(this, OnDatabaseChanged);
+        }
+
+        private void LiveQueryableLiteCollection_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            switch(e.Action) {                
+                case NotifyCollectionChangedAction.Add:
+                    ItemChanged?.Invoke(this, new ItemChangedEventArgs<T>(ItemChangedEventArgs<T>.CollectionChangeType.Added, e.NewItems?.Cast<T>()?.FirstOrDefault()));
+                    break;
+                case NotifyCollectionChangedAction.Remove:
+                    ItemChanged?.Invoke(this, new ItemChangedEventArgs<T>(ItemChangedEventArgs<T>.CollectionChangeType.Removed, e.OldItems?.Cast<T>()?.FirstOrDefault()));
+                    break;
+                case NotifyCollectionChangedAction.Move:
+                    ItemChanged?.Invoke(this, new ItemChangedEventArgs<T>(ItemChangedEventArgs<T>.CollectionChangeType.Updated, e.NewItems?.Cast<T>()?.FirstOrDefault()));
+                    break;
+            }
         }
 
         private void ReloadData()
@@ -107,14 +130,21 @@ namespace MongoDB.Sync.LocalDataCache
                     var newRecordValue = subCollection.FindById(new ObjectId(message.Value.Id));
                     var newRecord = BsonMapper.Global.Deserialize(item.PropertyType, newRecordValue);
 
+                    var propInfo = typeof(T).GetProperty(item.Name);
+                    if (propInfo is null) return;
+
                     foreach (var record in this)
                     {
-                        var subRecord = record.GetType().GetProperty(item.Name)!.GetValue(record);
-                        var id = subRecord?.GetType().GetProperty("Id");
-                        if (id is not null && (ObjectId?) id.GetValue(subRecord) == message.Value.Id)
-                        {                            
+                        var subRecord = propInfo.GetValue(record);
+                        if (subRecord is null) continue;
 
-                            record.GetType().GetProperty(item.Name)!.SetValue(record, newRecord);
+                        var subIdProp = subRecord.GetType().GetProperty("Id");
+                        if (subIdProp is null) continue;
+
+                        var subId = subIdProp.GetValue(subRecord) as ObjectId;
+                        if (subId == message.Value.Id)
+                        {
+                            propInfo.SetValue(record, newRecord);
                         }
                     }
 
@@ -185,19 +215,18 @@ namespace MongoDB.Sync.LocalDataCache
         public void EndUpdate()
         {
             _suspendNotifications =false;
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+            try
+            {
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move));
+            }
+            catch
+            {
+                // Handle exception
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+            }
         }
 
-        protected override void InsertItem(int index, T item)
-        {
-            if (_suspendNotifications)
-            {
-                base.InsertItem(index, item);
-                return;
-            }
-            
-            base.InsertItem(index, item);
-        }
+        
 
         protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
         {
@@ -230,11 +259,36 @@ namespace MongoDB.Sync.LocalDataCache
             {
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move));                
             }
-            catch (Exception ex)
+            catch
             {
                 // Handle exception
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
             }                
         }
+
+        protected override void InsertItem(int index, T item)
+        {
+            if (_suspendNotifications)
+            {
+                base.InsertItem(index, item);
+                HookPropertyChanged(item);
+                return;
+            }
+
+            base.InsertItem(index, item);
+            HookPropertyChanged(item);
+        }
+
+        private void HookPropertyChanged(T item)
+        {
+            if (item is INotifyPropertyChanged notifyItem)
+            {
+                notifyItem.PropertyChanged += (s, e) =>
+                {
+                    ItemChanged?.Invoke(this, new ItemChangedEventArgs<T>(ItemChangedEventArgs<T>.CollectionChangeType.Updated, item, e.PropertyName));
+                };
+            }
+        }
+
     }
 }
