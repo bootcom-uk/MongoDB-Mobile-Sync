@@ -39,13 +39,13 @@ namespace MongoDB.Sync.LocalDataCache
             _filter = filter;
             _order = order;
 
-            _usedCollections.Add(typeof(T), collectionName);
+            _usedCollections.TryAdd(typeof(T), collectionName);
 
             foreach (var prpInfo in typeof(T).GetProperties())
             {
                 var attribute = prpInfo.PropertyType.GetCustomAttribute<CollectionNameAttribute>();
                 if (attribute is null) continue;
-                _usedCollections.Add(prpInfo.PropertyType, attribute.CollectionName);
+                _usedCollections.TryAdd(prpInfo.PropertyType, attribute.CollectionName);
             }
 
             // Load Initial Data
