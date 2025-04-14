@@ -47,7 +47,7 @@ namespace MongoDB.Sync
                 // Convert MongoDB '$numberDouble'
                 if(obj.ContainsKey("$numberDouble") && obj["$numberDouble"] is JsonValue doubleValue)
                 {
-                    return doubleValue.GetValue<double>();
+                    return Convert.ToDouble(doubleValue);
                 }
 
                 // Convert MongoDB `$date` → `DateTime`

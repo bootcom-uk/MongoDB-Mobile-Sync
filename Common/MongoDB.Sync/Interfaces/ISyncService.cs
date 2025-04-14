@@ -7,9 +7,6 @@ namespace MongoDB.Sync.Interfaces
         // Indicates if the synchronization process is currently in progress
         bool AppSyncInProgress { get; set; }
 
-        // Event that is triggered when new data is received or updated in real-time
-        event EventHandler<UpdatedData>? OnDataUpdated;
-
         // Starts the synchronization process, optionally from a specific point in time or ID
         Task StartSyncAsync();
 

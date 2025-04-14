@@ -276,7 +276,7 @@ namespace MongoDB.Sync.Services
 
         public LiveQueryableLiteCollection<T> GetLiveCollection<T>(string name, Func<T, bool>? filter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? order = null) where T : BaseLocalCacheModel
         {
-            return new LiveQueryableLiteCollection<T>(_db, name, filter, order);
+            return new LiveQueryableLiteCollection<T>(_messenger, _db, name, filter, order);
         }
 
         private Queue<SyncLocalCacheDataChange> _changesToProcess = new();
