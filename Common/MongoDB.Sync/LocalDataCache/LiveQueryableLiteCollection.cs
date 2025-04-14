@@ -23,12 +23,14 @@ namespace MongoDB.Sync.LocalDataCache
 
         private readonly LiteDatabase _db;
         private readonly ILiteCollection<T> _collection;
+        private readonly IMessenger _messenger;
         private Func<T, bool>? _filter;
         private Func<IQueryable<T>, IOrderedQueryable<T>>? _order;
         private bool _suspendNotifications = false;
         private Dictionary<Type, string> _usedCollections = new();
 
         public LiveQueryableLiteCollection(
+            IMessenger messenger,
             LiteDatabase db,
             string collectionName,
             Func<T, bool>? filter = null,
@@ -38,6 +40,7 @@ namespace MongoDB.Sync.LocalDataCache
             _collection = _db.GetCollection<T>(collectionName);
             _filter = filter;
             _order = order;
+            _messenger = messenger;
 
             _usedCollections.TryAdd(typeof(T), collectionName);
 
@@ -54,7 +57,7 @@ namespace MongoDB.Sync.LocalDataCache
             this.CollectionChanged += LiveQueryableLiteCollection_CollectionChanged;
 
             // Listen for messages instead of LiteDBChangeNotifier
-            WeakReferenceMessenger.Default.Register<DatabaseChangeMessage>(this, OnDatabaseChanged);
+            _messenger.Register<DatabaseChangeMessage>(this, OnDatabaseChanged);
         }
 
         private void LiveQueryableLiteCollection_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -220,18 +223,11 @@ namespace MongoDB.Sync.LocalDataCache
         private void EndUpdate()
         {
             _suspendNotifications =false;
-            try
-            {
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move));
-            }
-            catch
-            {
-                // Handle exception
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-            }
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+
         }
 
-        
+
 
         protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
         {
@@ -260,40 +256,12 @@ namespace MongoDB.Sync.LocalDataCache
         {
             _suspendNotifications = false;
             ReapplySort(); // Apply any sorting now that the batch is done
-            try
-            {
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move));                
-            }
-            catch
-            {
-                // Handle exception
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-            }                
+      
+            // Handle exception
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+                       
         }
 
-        protected override void InsertItem(int index, T item)
-        {
-            if (_suspendNotifications)
-            {
-                base.InsertItem(index, item);
-                HookPropertyChanged(item);
-                return;
-            }
-
-            base.InsertItem(index, item);
-            HookPropertyChanged(item);
-        }
-
-        private void HookPropertyChanged(T item)
-        {
-            if (item is INotifyPropertyChanged notifyItem)
-            {
-                notifyItem.PropertyChanged += (s, e) =>
-                {
-                    ItemChanged?.Invoke(this, new ItemChangedEventArgs<T>(ItemChangedEventArgs<T>.CollectionChangeType.Updated, item, e.PropertyName));
-                };
-            }
-        }
 
     }
 }

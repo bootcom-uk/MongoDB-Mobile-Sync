@@ -36,8 +36,6 @@ namespace MongoDB.Sync.Services
 
         public readonly LocalDatabaseSyncService _localDatabaseService;
 
-        public event EventHandler<UpdatedData>? OnDataUpdated;
-
         private JsonSerializerOptions _serializationOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -93,9 +91,7 @@ namespace MongoDB.Sync.Services
             {
                 
                 _messenger.Send<RealtimeUpdateReceivedMessage>(new RealtimeUpdateReceivedMessage(jsonData));
-
-                var data = JsonSerializer.Deserialize<UpdatedData>(jsonData);
-                OnDataUpdated?.Invoke(this, data!);
+                               
             }
         }
 

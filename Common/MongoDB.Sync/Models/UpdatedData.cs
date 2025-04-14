@@ -1,4 +1,5 @@
 ﻿using LiteDB;
+using System.Text.Json.Serialization;
 
 namespace MongoDB.Sync.Models
 {
