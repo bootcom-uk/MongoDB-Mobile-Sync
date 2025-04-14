@@ -264,7 +264,8 @@ namespace MongoDB.Sync.Web.Services
             var documents = await collection
                 .Find(filter)
                 .Limit(BatchSize)
-                .SortByDescending(doc => doc["_id"])
+                .SortByDescending(doc => doc["__meta.dateUpdated"])
+                .SortByDescending(doc => doc["_id"]) // Sort by _id to ensure consistent ordering
                 .Skip((pageNumber - 1) * BatchSize)
                 .ToListAsync();
 
