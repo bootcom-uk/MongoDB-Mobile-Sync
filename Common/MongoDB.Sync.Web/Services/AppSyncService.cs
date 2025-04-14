@@ -257,22 +257,23 @@ namespace MongoDB.Sync.Web.Services
         }
 
         private async Task<List<string>> FetchBatchAsync(
-            IMongoCollection<BsonDocument> collection,
-            FilterDefinition<BsonDocument> filter,
-            int pageNumber)
+    IMongoCollection<BsonDocument> collection,
+    FilterDefinition<BsonDocument> filter,
+    int pageNumber)
         {
+            var sortBuilder = Builders<BsonDocument>.Sort;
+            var sort = sortBuilder.Ascending("__meta.dateUpdated").Ascending("_id");
+
             var documents = await collection
                 .Find(filter)
-                .Limit(BatchSize)
-                .SortByDescending(doc => doc["__meta.dateUpdated"])
-                .SortByDescending(doc => doc["_id"]) // Sort by _id to ensure consistent ordering
+                .Sort(sort)
                 .Skip((pageNumber - 1) * BatchSize)
+                .Limit(BatchSize)
                 .ToListAsync();
 
-            // Convert each document to JSON string to avoid BsonDocument serialization issues
             return documents.Select(doc => doc.ToJson()).ToList();
         }
 
-        
+
     }
 }
