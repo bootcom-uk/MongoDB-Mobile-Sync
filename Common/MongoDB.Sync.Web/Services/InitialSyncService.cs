@@ -112,7 +112,7 @@ namespace MongoDB.Sync.Web.Services
                 var documents = await sourceCollection
                     .Find(Builders<BsonDocument>.Filter.Empty)
                     .Skip(batch * batchSize)
-                    .SortBy(record => record["_id"]) // Ensure consistent ordering
+                    .SortByDescending(record => record["_id"]) // Ensure consistent ordering
                     .Limit(batchSize)
                 .ToListAsync();
 
