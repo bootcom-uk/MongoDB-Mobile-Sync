@@ -15,10 +15,12 @@ namespace MongoDB.Sync.Web.Interfaces
 
         Task<Dictionary<string, string>?> WriteDataToMongo(string appName, WebLocalCacheDataChange webLocalCacheDataChange);
 
-        Task<SyncResult> SyncAppDataAsync(string appName,
+        Task<SyncResult> SyncAppDataAsync(
+    string appName,
     string userId,
     string databaseName,
     string collectionName,
+    bool isInitialSync = false,
     int pageNumber = 1,
     string? lastSyncedId = null,
     DateTime? lastSyncDate = null);

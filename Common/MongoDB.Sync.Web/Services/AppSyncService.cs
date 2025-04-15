@@ -208,6 +208,7 @@ namespace MongoDB.Sync.Web.Services
     string userId,
     string databaseName,
     string collectionName,
+    bool isInitialSync = false,
     int pageNumber = 1,
     string? lastSyncedId = null,
     DateTime? lastSyncDate = null)
@@ -232,14 +233,19 @@ namespace MongoDB.Sync.Web.Services
             var sourceCollection = sourceDb.GetCollection<BsonDocument>(fullCollectionName);
 
             var filterBuilder = Builders<BsonDocument>.Filter;
-            var filter = lastSyncDate.HasValue
-                ? filterBuilder.Gt("__meta.dateUpdated", lastSyncDate.Value)
-                : filterBuilder.Empty;
+            var filter = Builders<BsonDocument>.Filter.Empty;
 
-            if (!string.IsNullOrEmpty(lastSyncedId))
+            if (!isInitialSync)
             {
-                var idFilter = filterBuilder.Gt("_id", new ObjectId(lastSyncedId));
-                filter &= idFilter;
+                if (lastSyncDate.HasValue)
+                {
+                    filter = filterBuilder.Gt("__meta.dateUpdated", lastSyncDate.Value);
+                }
+                else if (!string.IsNullOrEmpty(lastSyncedId))
+                {
+                    var idFilter = filterBuilder.Gt("_id", new ObjectId(lastSyncedId));
+                    filter = idFilter;
+                }
             }
 
             // Fetch batch of documents
