@@ -108,6 +108,10 @@ namespace MongoDB.Sync.Services
             var dataSyncResult = (null as SyncResult);
             var pageNumber = 1;
 
+            var collectionName = $"{item.DatabaseName}_{item.CollectionName}".Replace("-", "_");
+            var lastId = _localDatabaseService.GetLastId(item.DatabaseName, item.CollectionName);
+            var initialSync = lastId == null;
+
             while (dataSyncResult == null || (dataSyncResult != null && dataSyncResult.Data!.Count > 0))
             {
                 Console.WriteLine($"Syncing {item.DatabaseName}.{item.CollectionName} Page {pageNumber}");
@@ -118,22 +122,18 @@ namespace MongoDB.Sync.Services
                         { "AppName", _appName },
                         { "DatabaseName", item.DatabaseName },
                         { "CollectionName", item.CollectionName },
-                        { "PageNumber", pageNumber.ToString() }
+                        { "PageNumber", pageNumber.ToString() },
+                        { "InitialSync", initialSync.ToString() }
+
                     };
 
+                var lastSyncDate = _localDatabaseService.GetLastSyncDateTime(item.DatabaseName, item.CollectionName);
+                Console.WriteLine($"Checking last sync date time for database: {item.DatabaseName} collection: {item.CollectionName}. Last date is: {lastSyncDate}");
+                if (lastSyncDate != null) formContent.Add("LastSyncDate", $"{lastSyncDate?.ToString("O")}");
 
-                if (_appDetails!.InitialSyncComplete)
-                {
-                    var lastSyncDate = _localDatabaseService.GetLastSyncDateTime(item.DatabaseName, item.CollectionName);
-                    Console.WriteLine($"Checking last sync date time for database: {item.DatabaseName} collection: {item.CollectionName}. Last date is: {lastSyncDate}");
-                    if (lastSyncDate != null) formContent.Add("LastSyncDate", $"{lastSyncDate?.ToString("O")}");
-                }
-                else
-                {
-                    var lastSyncedId = _localDatabaseService.GetLastId(item.DatabaseName, item.CollectionName);
-                    if (lastSyncedId != null) formContent.Add("LastSyncedId", lastSyncedId!.ToString());
-                }
-
+                var lastSyncedId = _localDatabaseService.GetLastId(item.DatabaseName, item.CollectionName);
+                if (lastSyncedId != null) formContent.Add("LastSyncedId", lastSyncedId!.ToString());
+                                
                 builder.WithFormContent(formContent);
 
                 if (_preRequestAction != null) builder.PreRequest(_preRequestAction);
