@@ -262,7 +262,7 @@ namespace MongoDB.Sync.Web.Services
     int pageNumber)
         {
             var sortBuilder = Builders<BsonDocument>.Sort;
-            var sort = sortBuilder.Ascending("__meta.dateUpdated").Ascending("_id");
+            var sort = sortBuilder.Ascending("_id");
 
             var documents = await collection
                 .Find(filter)
