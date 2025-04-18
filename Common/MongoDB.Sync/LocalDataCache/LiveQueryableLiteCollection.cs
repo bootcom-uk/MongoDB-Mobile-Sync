@@ -191,6 +191,8 @@ namespace MongoDB.Sync.LocalDataCache
 
             EndBatchUpdate();
 
+            //ReloadData();
+
         }
 
         private void ReapplySort()
@@ -223,8 +225,7 @@ namespace MongoDB.Sync.LocalDataCache
         private void EndUpdate()
         {
             _suspendNotifications =false;
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));            
         }
 
 
@@ -258,7 +259,7 @@ namespace MongoDB.Sync.LocalDataCache
             ReapplySort(); // Apply any sorting now that the batch is done
       
             // Handle exception
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset) );
                        
         }
 

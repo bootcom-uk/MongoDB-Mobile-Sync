@@ -1,19 +1,14 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using LiteDB;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui.Controls;
 using MongoDB.Sync.LocalDataCache;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
 using Services;
 using System.Collections;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
 using System.Reflection;
-using System.Text.Json;
-using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace MongoDB.Sync.Services
 {
@@ -45,7 +40,21 @@ namespace MongoDB.Sync.Services
             Task.Run(ProcessQueue);
         }
 
-        private readonly Dictionary<Type, List<PropertyInfo>> _mappedTypes = new();
+        public Type? CollectionNameToType(string collectionName)
+        {
+            foreach (var item in _mappedTypes)
+            {
+                var attribute = item.Key.GetCustomAttribute<CollectionNameAttribute>();
+                if (attribute is null) continue;
+                if (attribute.CollectionName == collectionName)
+                {
+                    return item.Key;
+                }
+            }
+            return null;
+        }
+
+        internal readonly Dictionary<Type, List<PropertyInfo>> _mappedTypes = new();
 
         private void InitializeReferenceResolvers()
         {
@@ -123,6 +132,7 @@ namespace MongoDB.Sync.Services
                                    continue;
                                }                                
                             }
+                           
 
                             var propertyValue = kvp.Value;
 
@@ -149,8 +159,28 @@ namespace MongoDB.Sync.Services
                                 continue;
                             }
 
-                            if (kvp.Value!.IsString)
+                           var propertyInfo = item.GetType().GetProperty(key);
+                           if (propertyInfo != null &&
+                               propertyInfo.PropertyType == typeof(ObjectId) &&
+                               kvp.Value != null &&
+                               kvp.Value.IsString)
+                           {
+                               propertyInfo.SetValue(item, new ObjectId(kvp.Value.AsString));
+                               continue;
+                           }
+
+                           if (propertyInfo != null &&
+                              propertyInfo.PropertyType != typeof(string) &&
+                              kvp.Value != null &&
+                              kvp.Value.IsString && !_mappedTypes.ContainsKey(propertyInfo.PropertyType)) 
+                           {
+                               propertyInfo.SetValue(item, Convert.ChangeType(kvp.Value.AsString, propertyInfo.PropertyType));
+                               continue;
+                           }
+
+                           if (kvp.Value!.IsString)
                             {
+
                                 item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsString);
                                 continue;
                             }
