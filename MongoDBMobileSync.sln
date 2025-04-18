@@ -19,7 +19,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDB.Sync.Web", "Common\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDB.Sync.Models", "Common\MongoDB.Sync.Models\MongoDB.Sync.Models.csproj", "{4A4C3249-860A-4C18-8718-184AB33EDB2B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDB.Sync.Core.Services.Models", "..\Common\MongoDB.Sync.Core.Services.Models\MongoDB.Sync.Core.Services.Models.csproj", "{08443A19-717C-48FF-B431-E32682971ADA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDB.Sync.Core.Services.Models", "Common\MongoDB.Sync.Core.Services.Models\MongoDB.Sync.Core.Services.Models.csproj", "{08443A19-717C-48FF-B431-E32682971ADA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
