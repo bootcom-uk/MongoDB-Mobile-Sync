@@ -1,10 +1,13 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using LiteDB;
+using MongoDB.Sync.Converters;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
 using System.Collections;
 using System.Reflection;
+using System.Reflection.Metadata;
+using System.Text.Json.Nodes;
 
 namespace MongoDB.Sync.Services
 {
@@ -15,11 +18,14 @@ namespace MongoDB.Sync.Services
 
         public readonly LiteDatabase LiteDb;
 
+        private readonly LocalCacheService _localCacheService;
+
         private string? _appName { get; set; }
 
-        public LocalDatabaseSyncService(IMessenger messenger, string liteDbPath) {
+        public LocalDatabaseSyncService(IMessenger messenger, string liteDbPath, LocalCacheService localCacheService) {
             LiteDb = new LiteDatabase(liteDbPath);
             _messenger = messenger;
+            _localCacheService = localCacheService;
 
             _messenger.Register<RealtimeUpdateReceivedMessage>(this, HandleRealtimeUpdate);
             _messenger.Register<APISyncMessageReceived>(this, HandleAPISyncMessageReceived);
@@ -212,80 +218,174 @@ namespace MongoDB.Sync.Services
         {
             try
             {
+               // var updateData = System.Text.Json.JsonSerializer.Deserialize<PayloadModel>(message.Value);
+
+               // var doc = LiteDB.JsonSerializer.Deserialize(updateData!.Document.GetRawText()).AsDocument;
+
+
                 var updateData = System.Text.Json.JsonSerializer.Deserialize<PayloadModel>(message.Value);
-                if (updateData is null || updateData.Document is null) return;
-
-                String docJson = Convert.ToString(updateData.Document)!;
-
-                var updateDoc = MongoJsonConverter.ConvertMongoJsonToLiteDB(docJson);
-
-                if (updateDoc is null) return;
+                if(updateData is null) return;
 
                 var collectionName = $"{updateData.Database}_{updateData.Collection}".Replace("-", "_");
+
+                var outputType = _localCacheService.CollectionNameToType(collectionName);
+
+                if (outputType is null) return;
+
+                var convertedDoc = System.Text.Json.JsonSerializer.Deserialize(updateData.Document.GetRawText(), outputType);
+
+                var doc = LiteDB.JsonSerializer.Deserialize(updateData.Document.ToString()).AsDocument;
+
+
+                // if (updateData is null || updateData.Document is null) return;
+
+                // String docJson = Convert.ToString(updateData.Document)!;
+
+                // New code start
+
+                //var updateDataDoc = System.Text.Json.JsonSerializer.Deserialize<PayloadModel>(message.Value);
+
+                //var jsonObject = MongoJsonConverter.ConvertMongoJsonToLiteDB(updateDataDoc.Document.GetRawText());
+
+                //var doc = LiteDB.JsonSerializer.Deserialize(jsonObject).AsDocument;
+
+                if (doc is null) return;
+
+               // var updateData = BsonMapper.Global.Deserialize<UpdatedData>(doc); 
+
                 var collection = LiteDb.GetCollection(collectionName);
 
                 // If the document doesn't contain an ID, we can't do anything with it
-                if (!updateDoc.TryGetValue("_id", out var documentId))
-                {                                        
+                if (!doc.TryGetValue("_id", out var documentId))
+                {
                     return;
                 }
 
-                // Check if the update document contains metadata for deletion
-                if (updateDoc.TryGetValue("deleted", out var isDeleted) && isDeleted.AsBoolean)
+                BsonDocument existingDoc;    
+
+                switch (updateData.Action)
                 {
+                    case "insert":
+                        existingDoc = collection.FindOne(record => record["_id"].AsObjectId == documentId.AsObjectId);
+                        if (existingDoc != null) return;
 
-                    // If the doc is marked as deleted, remove it from the local cache 
-                   var deleted = collection.Delete(documentId);
+                        collection.Insert(doc);
 
-                    if (isDeleted is null)
-                    {
-                        isDeleted = new BsonValue(false);
-                    }
+                        _messenger.Send(new DatabaseChangeMessage(new()
+                        {
+                            ChangedItem = doc,
+                            CollectionName = collectionName,
+                            Id = documentId
+                        }));
+                        break;
+                    case "update":
+                        existingDoc = collection.FindOne(record => record["_id"].AsObjectId == documentId.AsObjectId);
+                        if (existingDoc == null) return;
+                        // Merge the update into the existing document
+                        foreach (var kvp in doc)
+                        {
+                            if (kvp.Key == "_id") continue;
+                            existingDoc[kvp.Key] = kvp.Value;
+                        }
 
-                    _messenger.Send(new DatabaseChangeMessage(new()
-                    {
-                        ChangedItem = null,
-                        IsDeleted = isDeleted ,
-                        CollectionName = collectionName,
-                        Id = documentId
-                    }));
+                        //Save the merged document
+                        var updated = collection.Update(existingDoc);
 
-                    return;
+                        _messenger.Send(new DatabaseChangeMessage(new()
+                        {
+                            ChangedItem = existingDoc,
+                            CollectionName = collectionName,
+                            Id = documentId
+                        }));
+                        break;
+                    case "delete":
+                        var deleted = collection.Delete(documentId);
+
+                        _messenger.Send(new DatabaseChangeMessage(new()
+                        {
+                            ChangedItem = null,
+                            IsDeleted = true,
+                            CollectionName = collectionName,
+                            Id = documentId
+                        }));
+                        break;
+                    default:
+                        return;
                 }
 
-                // Try to fetch the existing document from LiteDB
-                var existingDoc = collection.FindOne(record => record["_id"].AsObjectId == documentId.AsObjectId);
-                if (existingDoc != null)
-                {
-                    // Merge the update into the existing document
-                    foreach (var kvp in updateDoc)
-                    {
-                        if(kvp.Key == "_id") continue;
-                        existingDoc[kvp.Key] = kvp.Value;
-                    }
+                // New code end
 
-                    // Save the merged document
-                   var updated = collection.Update(existingDoc);
-                    
-                    
-                }
-                else
-                {
-                    // If the document doesn't exist, insert the update as a new document
-                    collection.Insert(updateDoc);
+               // var updateDoc = MongoJsonConverter.ConvertMongoJsonToLiteDB(docJson);
 
-                    // Update the last processed ID
-                    SetLastId(updateData.Database, updateData.Collection, documentId.AsObjectId);
 
-                }
 
-                _messenger.Send(new DatabaseChangeMessage(new()
-                {
-                    ChangedItem = updateDoc,
-                    IsDeleted = false,
-                    CollectionName = collectionName,
-                    Id = documentId
-                }));
+               // if (updateDoc is null) return;
+
+               // var collectionName = $"{updateData.Database}_{updateData.Collection}".Replace("-", "_");
+               // var collection = LiteDb.GetCollection(collectionName);
+
+               // If the document doesn't contain an ID, we can't do anything with it
+               // if (!updateDoc.TryGetValue("_id", out var documentId))
+               // {
+               //     return;
+               // }
+
+               // Check if the update document contains metadata for deletion
+               // if (updateDoc.TryGetValue("deleted", out var isDeleted) && isDeleted.AsBoolean)
+               //     {
+
+               //         If the doc is marked as deleted, remove it from the local cache
+               //    var deleted = collection.Delete(documentId);
+
+               //         if (isDeleted is null)
+               //         {
+               //             isDeleted = new BsonValue(false);
+               //         }
+
+               //         _messenger.Send(new DatabaseChangeMessage(new()
+               //         {
+               //             ChangedItem = null,
+               //             IsDeleted = isDeleted,
+               //             CollectionName = collectionName,
+               //             Id = documentId
+               //         }));
+
+               //         return;
+               //     }
+
+               // Try to fetch the existing document from LiteDB
+               //var existingDoc = collection.FindOne(record => record["_id"].AsObjectId == documentId.AsObjectId);
+               // if (existingDoc != null)
+               // {
+               //     Merge the update into the existing document
+               //     foreach (var kvp in updateDoc)
+               //     {
+               //         if (kvp.Key == "_id") continue;
+               //         existingDoc[kvp.Key] = kvp.Value;
+               //     }
+
+               //     Save the merged document
+               //    var updated = collection.Update(existingDoc);
+
+
+               // }
+               // else
+               // {
+               //     If the document doesn't exist, insert the update as a new document
+               //     collection.Insert(updateDoc);
+
+               //     Update the last processed ID
+               //     SetLastId(updateData.Database, updateData.Collection, documentId.AsObjectId);
+
+               // }
+
+               // _messenger.Send(new DatabaseChangeMessage(new()
+               // {
+               //     ChangedItem = updateDoc,
+               //     IsDeleted = false,
+               //     CollectionName = collectionName,
+               //     Id = documentId
+               // }));
 
             }
             catch (Exception ex)

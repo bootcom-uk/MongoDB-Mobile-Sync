@@ -1,22 +1,34 @@
-﻿using System;
+﻿using LiteDB;
+using System;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using LiteDB;
+using System.Text.RegularExpressions;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
-namespace MongoDB.Sync
+namespace MongoDB.Sync.Converters
 {
     public static class MongoJsonConverter
     {
 
-        public static BsonDocument ConvertMongoJsonToLiteDB(string ejson)
+        public static string ConvertMongoJsonToLiteDB(string ejson)
         {
-            var node = JsonNode.Parse(ejson);
-            if (node is JsonObject obj)
+            var json = ejson;
+
+            // Replace $oid
+            json = Regex.Replace(json, @"\{\s*""\$oid""\s*:\s*""(?<oid>[a-fA-F0-9]+)""\s*\}", "\"$1\"");
+
+            // Replace $numberLong (used inside $date)
+            json = Regex.Replace(json, @"\{\s*""\$numberLong""\s*:\s*""(?<long>\d+)""\s*\}", "${long}");
+
+            // Replace $date wrapper
+            json = Regex.Replace(json, @"\{\s*""\$date""\s*:\s*(\d+)\s*\}", match =>
             {
-                return ConvertJsonObject(obj);
-            }
-            throw new InvalidOperationException("Invalid JSON format");
+                var millis = long.Parse(match.Groups[1].Value);
+                var dt = DateTimeOffset.FromUnixTimeMilliseconds(millis).UtcDateTime;
+                return $"\"{dt:O}\""; // ISO 8601
+            });
+
+            return json;
         }
 
         private static BsonDocument ConvertJsonObject(JsonObject obj)

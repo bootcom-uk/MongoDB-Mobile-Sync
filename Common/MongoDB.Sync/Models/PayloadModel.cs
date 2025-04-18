@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 
 namespace MongoDB.Sync.Models
 {
@@ -20,7 +16,7 @@ namespace MongoDB.Sync.Models
         public string Database { get; set; }
 
         [JsonPropertyName("document")]
-        public Object Document { get; set; }
+        public JsonElement Document { get; set; }
 
         [JsonPropertyName("appId")]
         public string AppId { get; set; }
