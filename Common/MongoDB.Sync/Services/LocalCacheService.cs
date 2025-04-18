@@ -1,6 +1,8 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using LiteDB;
 using Microsoft.Extensions.Logging;
+using MongoDB.Sync.Core.Services.Models.Models;
+using MongoDB.Sync.Core.Services.Models.Services;
 using MongoDB.Sync.LocalDataCache;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
@@ -23,8 +25,9 @@ namespace MongoDB.Sync.Services
         private readonly Func<HttpRequestMessage, Task>? _preRequestAction;
         private readonly Func<HttpRequestMessage, Task>? _statusChangeAction;
         private readonly IMessenger _messenger;
+        private readonly BaseTypeResolverService _baseTypeResolverService;
 
-        public LocalCacheService(IMessenger messenger, LocalDatabaseSyncService localDatabaseSyncService, ILogger<LocalCacheService> logger, HttpService httpService, string apiUrl, string appName, Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction)
+        public LocalCacheService(IMessenger messenger, LocalDatabaseSyncService localDatabaseSyncService, ILogger<LocalCacheService> logger, HttpService httpService, string apiUrl, string appName, Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction, BaseTypeResolverService baseTypeResolverService)
         {
             _logger = logger;
             _httpService = httpService;
@@ -60,30 +63,8 @@ namespace MongoDB.Sync.Services
         {
             var mapper = BsonMapper.Global;
 
-            var assemblies = new List<Assembly>();
-            assemblies.AddRange(AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location)));
-
-            var allTypes = assemblies
-                .SelectMany(a => a.GetTypes())
-                .Where(t =>
-                    t.IsClass &&
-                    typeof(BaseLocalCacheModel).IsAssignableFrom(t) &&
-                    t.GetCustomAttribute<CollectionNameAttribute>() != null);
-
-            foreach (var refType in allTypes)
-            {
-
-                if(refType.GetCustomAttribute<CollectionNameAttribute>() is null) continue;
-
-                var baseModels = refType.GetProperties()
-                    .Where(t => typeof(BaseLocalCacheModel).IsAssignableFrom(t.PropertyType));
-
-                _mappedTypes.Add(refType, baseModels.ToList());
-
-            }
-
-            foreach(var type in _mappedTypes.Keys)
+           
+            foreach(var type in _baseTypeResolverService.MappedTypes.Keys)
             {
                 mapper.RegisterType(type, 
                    deserialize: bson => {
