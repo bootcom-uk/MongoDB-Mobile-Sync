@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace MongoDB.Sync.Web.Attributes
 {
+    [AttributeUsage(AttributeTargets.Method)]
     public class RequiresPermissionAttribute : AuthorizeAttribute, IAsyncAuthorizationFilter
     {
         private readonly string _requiredPermission;
