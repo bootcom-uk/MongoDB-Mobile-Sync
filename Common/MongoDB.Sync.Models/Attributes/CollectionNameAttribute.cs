@@ -1,5 +1,6 @@
 ﻿namespace MongoDB.Sync.Models.Attributes
 {
+    [AttributeUsage(AttributeTargets.Class)]
     public sealed class CollectionNameAttribute : Attribute
     {
 
