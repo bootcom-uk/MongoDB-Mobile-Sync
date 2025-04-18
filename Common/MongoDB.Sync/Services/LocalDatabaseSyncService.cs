@@ -18,14 +18,11 @@ namespace MongoDB.Sync.Services
 
         public readonly LiteDatabase LiteDb;
 
-        private readonly LocalCacheService _localCacheService;
-
         private string? _appName { get; set; }
 
-        public LocalDatabaseSyncService(IMessenger messenger, string liteDbPath, LocalCacheService localCacheService) {
+        public LocalDatabaseSyncService(IMessenger messenger, string liteDbPath) {
             LiteDb = new LiteDatabase(liteDbPath);
             _messenger = messenger;
-            _localCacheService = localCacheService;
 
             _messenger.Register<RealtimeUpdateReceivedMessage>(this, HandleRealtimeUpdate);
             _messenger.Register<APISyncMessageReceived>(this, HandleAPISyncMessageReceived);
@@ -228,7 +225,7 @@ namespace MongoDB.Sync.Services
 
                 var collectionName = $"{updateData.Database}_{updateData.Collection}".Replace("-", "_");
 
-                var outputType = _localCacheService.CollectionNameToType(collectionName);
+                var outputType = null as Type ; // _localCacheService.CollectionNameToType(collectionName);
 
                 if (outputType is null) return;
 
