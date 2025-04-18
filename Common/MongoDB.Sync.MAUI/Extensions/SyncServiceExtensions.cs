@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
+using MongoDB.Sync.Core.Services.Models.Services;
 using MongoDB.Sync.Interfaces;
 using MongoDB.Sync.MAUI.Models;
 using MongoDB.Sync.Services;
@@ -26,6 +27,8 @@ namespace MongoDB.Sync.MAUI.Extensions
             
             builder.Services.AddSingleton<NetworkStateService>();
 
+            builder.Services.AddSingleton<BaseTypeResolverService>();
+
             // Register SyncOptions as a singleton service
             builder.Services.AddSingleton(provider =>
             {
@@ -39,7 +42,7 @@ namespace MongoDB.Sync.MAUI.Extensions
             {
                 var options = provider.GetRequiredService<SyncOptions>();
                 var messenger = provider.GetRequiredService<IMessenger>();
-                return new LocalDatabaseSyncService(messenger, options.LiteDbPath, null);
+                return new LocalDatabaseSyncService(messenger, options.LiteDbPath);
             });
 
             builder.Services.AddSingleton<HttpService>();
