@@ -37,27 +37,13 @@ namespace MongoDB.Sync.Services
             _statusChangeAction = statusChangeAction;
             _messenger = messenger; 
             _db = localDatabaseSyncService.LiteDb;
+            _baseTypeResolverService = baseTypeResolverService;
 
             InitializeReferenceResolvers();
 
             Task.Run(ProcessQueue);
         }
 
-        public Type? CollectionNameToType(string collectionName)
-        {
-            foreach (var item in _mappedTypes)
-            {
-                var attribute = item.Key.GetCustomAttribute<CollectionNameAttribute>();
-                if (attribute is null) continue;
-                if (attribute.CollectionName == collectionName)
-                {
-                    return item.Key;
-                }
-            }
-            return null;
-        }
-
-        internal readonly Dictionary<Type, List<PropertyInfo>> _mappedTypes = new();
 
         private void InitializeReferenceResolvers()
         {
@@ -71,7 +57,7 @@ namespace MongoDB.Sync.Services
 
                        if(bson is null) return null;
 
-                       var mappedType = _mappedTypes[type];
+                       var mappedType = _baseTypeResolverService.MappedTypes[type];
 
                         var item = Activator.CreateInstance(type);
 
@@ -153,7 +139,7 @@ namespace MongoDB.Sync.Services
                            if (propertyInfo != null &&
                               propertyInfo.PropertyType != typeof(string) &&
                               kvp.Value != null &&
-                              kvp.Value.IsString && !_mappedTypes.ContainsKey(propertyInfo.PropertyType)) 
+                              kvp.Value.IsString && !_baseTypeResolverService.MappedTypes.ContainsKey(propertyInfo.PropertyType)) 
                            {
                                propertyInfo.SetValue(item, Convert.ChangeType(kvp.Value.AsString, propertyInfo.PropertyType));
                                continue;

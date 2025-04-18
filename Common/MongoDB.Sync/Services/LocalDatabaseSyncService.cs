@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using LiteDB;
 using MongoDB.Sync.Converters;
+using MongoDB.Sync.Core.Services.Models.Services;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
@@ -20,9 +21,12 @@ namespace MongoDB.Sync.Services
 
         private string? _appName { get; set; }
 
-        public LocalDatabaseSyncService(IMessenger messenger, string liteDbPath) {
+        private readonly BaseTypeResolverService _baseTypeResolverService;
+
+        public LocalDatabaseSyncService(IMessenger messenger, string liteDbPath, BaseTypeResolverService baseTypeResolverService) {
             LiteDb = new LiteDatabase(liteDbPath);
             _messenger = messenger;
+            _baseTypeResolverService = baseTypeResolverService;
 
             _messenger.Register<RealtimeUpdateReceivedMessage>(this, HandleRealtimeUpdate);
             _messenger.Register<APISyncMessageReceived>(this, HandleAPISyncMessageReceived);
@@ -225,7 +229,7 @@ namespace MongoDB.Sync.Services
 
                 var collectionName = $"{updateData.Database}_{updateData.Collection}".Replace("-", "_");
 
-                var outputType = null as Type ; // _localCacheService.CollectionNameToType(collectionName);
+                var outputType = _baseTypeResolverService.CollectionNameToType(collectionName);
 
                 if (outputType is null) return;
 
