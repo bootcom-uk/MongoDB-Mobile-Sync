@@ -39,7 +39,8 @@ namespace MongoDB.Sync.MAUI.Extensions
             {
                 var options = provider.GetRequiredService<SyncOptions>();
                 var messenger = provider.GetRequiredService<IMessenger>();
-                return new LocalDatabaseSyncService(messenger, options.LiteDbPath);
+                var localCacheService = provider.GetRequiredService<LocalCacheService>();   
+                return new LocalDatabaseSyncService(messenger, options.LiteDbPath, localCacheService);
             });
 
             builder.Services.AddSingleton<HttpService>();
