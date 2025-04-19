@@ -93,7 +93,10 @@ namespace MongoDB.Sync.Services
                                 {
                                     var collectionName = prpInfo.PropertyType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
                                     var bsonObject = _db.GetCollection(collectionName).FindById(kvp.Value.AsObjectId);
-                                    var displayObject = BsonMapper.Global.Deserialize(prpInfo.PropertyType, bsonObject);
+
+                                   if (bsonObject is null) continue;
+
+                                   var displayObject = BsonMapper.Global.Deserialize(prpInfo.PropertyType, bsonObject);
 
                                     item!.GetType().GetProperty(key)?.SetValue(item, displayObject);
                                    continue;
