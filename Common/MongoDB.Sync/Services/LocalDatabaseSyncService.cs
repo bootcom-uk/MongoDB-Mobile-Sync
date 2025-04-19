@@ -233,26 +233,11 @@ namespace MongoDB.Sync.Services
 
                 if (outputType is null) return;
 
-                var convertedDoc = System.Text.Json.JsonSerializer.Deserialize(updateData.Document.GetRawText(), outputType);
+                var doc = EjsonConverter.NormalizeEjson(updateData.Document);
 
-                var doc = LiteDB.JsonSerializer.Deserialize(updateData.Document.ToString()).AsDocument;
-
-
-                // if (updateData is null || updateData.Document is null) return;
-
-                // String docJson = Convert.ToString(updateData.Document)!;
-
-                // New code start
-
-                //var updateDataDoc = System.Text.Json.JsonSerializer.Deserialize<PayloadModel>(message.Value);
-
-                //var jsonObject = MongoJsonConverter.ConvertMongoJsonToLiteDB(updateDataDoc.Document.GetRawText());
-
-                //var doc = LiteDB.JsonSerializer.Deserialize(jsonObject).AsDocument;
+                // You can now use this with LiteDB:
 
                 if (doc is null) return;
-
-               // var updateData = BsonMapper.Global.Deserialize<UpdatedData>(doc); 
 
                 var collection = LiteDb.GetCollection(collectionName);
 
@@ -267,6 +252,9 @@ namespace MongoDB.Sync.Services
                 switch (updateData.Action)
                 {
                     case "insert":
+
+                        // var typedObj = System.Text.Json.JsonSerializer.Deserialize(normalizedJson, outputType);
+
                         existingDoc = collection.FindOne(record => record["_id"].AsObjectId == documentId.AsObjectId);
                         if (existingDoc != null) return;
 
@@ -291,6 +279,7 @@ namespace MongoDB.Sync.Services
 
                         //Save the merged document
                         var updated = collection.Update(existingDoc);
+                                               
 
                         _messenger.Send(new DatabaseChangeMessage(new()
                         {
