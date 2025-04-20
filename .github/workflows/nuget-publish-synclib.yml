@@ -160,6 +160,9 @@ jobs:
 
     - name: Pack web NuGet package
       run: dotnet pack Common/MongoDB.Sync.Web/MongoDB.Sync.Web.csproj --configuration Release --output Common/MongoDB.Sync.Web/bin/Release /p:PackageVersion=${{ env.NEW_WEB_VERSION }}
+          
+    - name: Pack models NuGet package
+      run: dotnet pack Common/MongoDB.Sync.Models/MongoDB.Sync.Models.csproj --configuration Release --output Common/MongoDB.Sync.Models/bin/Release /p:PackageVersion=${{ env.NEW_MODELS_VERSION }}
 
     - name: Publish interfaces to NuGet
       shell: pwsh
@@ -167,9 +170,10 @@ jobs:
         $files = Get-ChildItem -Path "Common/MongoDB.Sync.Interfaces/bin/Release" -Filter *.nupkg -Recurse
         if ($files.Count -eq 0) {
           throw "No .nupkg files found in Common/MongoDB.Sync.Interfaces/bin/Release"
-    - name: Pack models NuGet package
-      run: dotnet pack Common/MongoDB.Sync.Models/MongoDB.Sync.Models.csproj --configuration Release --output Common/MongoDB.Sync.Models/bin/Release /p:PackageVersion=${{ env.NEW_MODELS_VERSION }}
-
+        }
+        $packagePath = $files[0].FullName
+        dotnet nuget push "$packagePath" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+        
     - name: Publish sync core service models to NuGet
       shell: pwsh
       run: |
