@@ -20,9 +20,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.14" />
-		<PackageReference Include="BootCom-MongoDB-Sync" Version="1.1.110" />
-		<PackageReference Include="BootCom-MongoDB-Sync-Core-Services-Models" Version="1.0.10" />	
+		<PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.15" />
+		<PackageReference Include="BootCom-MongoDB-Sync" Version="1.1.114" />
+		<PackageReference Include="BootCom-MongoDB-Sync-Core-Services-Models" Version="1.0.14" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.60" />
@@ -32,6 +32,10 @@
 
 	<ItemGroup>
 	  <Folder Include="Interfaces\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\MongoDB.Sync.Interfaces\MongoDB.Sync.Interfaces.csproj" />
 	</ItemGroup>
 
 </Project>

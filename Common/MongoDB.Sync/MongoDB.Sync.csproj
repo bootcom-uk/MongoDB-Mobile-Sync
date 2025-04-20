@@ -12,9 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.14" />
-    <PackageReference Include="BootCom-MongoDB-Sync-Core-Services-Models" Version="1.0.10" />
-    <PackageReference Include="BootCom-MongoDB-Sync-Models" Version="1.0.86" />
+    <PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.15" />
+    <PackageReference Include="BootCom-MongoDB-Sync-Core-Services-Models" Version="1.0.14" />
+    <PackageReference Include="BootCom-MongoDB-Sync-Interfaces" Version="1.0.3" />
+    <PackageReference Include="BootCom-MongoDB-Sync-Models" Version="1.0.89" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="LiteDB" Version="5.0.21" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
@@ -23,10 +24,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.Reactive" Version="6.0.1" />
     <PackageReference Include="System.Text.Json" Version="9.0.4" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\MongoDB.Sync.Interfaces\MongoDB.Sync.Interfaces.csproj" />
   </ItemGroup>
 
 </Project>
