@@ -24,7 +24,7 @@ jobs:
         dotnet-version: 9.0.x
 
     - name: Get Current Interface Version from File
-      id: get-sync-version
+      id: get-interface-version
       shell: bash
       run: |
         if [ ! -f interface_version.txt ]; then
