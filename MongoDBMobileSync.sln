@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDB.Sync.Models", "Comm
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDB.Sync.Core.Services.Models", "Common\MongoDB.Sync.Core.Services.Models\MongoDB.Sync.Core.Services.Models.csproj", "{08443A19-717C-48FF-B431-E32682971ADA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDB.Sync.Interfaces", "Common\MongoDB.Sync.Interfaces\MongoDB.Sync.Interfaces.csproj", "{0AF9E126-9A2D-441C-9B44-D742E049A9E9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,6 +53,10 @@ Global
 		{08443A19-717C-48FF-B431-E32682971ADA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{08443A19-717C-48FF-B431-E32682971ADA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{08443A19-717C-48FF-B431-E32682971ADA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0AF9E126-9A2D-441C-9B44-D742E049A9E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0AF9E126-9A2D-441C-9B44-D742E049A9E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0AF9E126-9A2D-441C-9B44-D742E049A9E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0AF9E126-9A2D-441C-9B44-D742E049A9E9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -62,6 +68,7 @@ Global
 		{E0385A7C-9CCA-4756-B86D-27DDF5C3327A} = {53E7D53A-5A80-4332-B779-AF35CB4FA2E3}
 		{4A4C3249-860A-4C18-8718-184AB33EDB2B} = {53E7D53A-5A80-4332-B779-AF35CB4FA2E3}
 		{08443A19-717C-48FF-B431-E32682971ADA} = {53E7D53A-5A80-4332-B779-AF35CB4FA2E3}
+		{0AF9E126-9A2D-441C-9B44-D742E049A9E9} = {53E7D53A-5A80-4332-B779-AF35CB4FA2E3}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7693B48E-79E1-4A24-8223-1BCE3C72D5FE}
