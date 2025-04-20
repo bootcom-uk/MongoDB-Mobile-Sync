@@ -1,9 +1,9 @@
-﻿using MongoDB.Sync.Models;
-
+﻿
 namespace MongoDB.Sync.Interfaces
 {
     public interface ISyncService
     {
+
         // Indicates if the synchronization process is currently in progress
         bool AppSyncInProgress { get; set; }
 
@@ -18,5 +18,6 @@ namespace MongoDB.Sync.Interfaces
 
         // Clears the LiteDB cache or performs other clean-up if needed
         Task ClearCacheAsync();
+
     }
 }

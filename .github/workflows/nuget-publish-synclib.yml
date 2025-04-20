@@ -23,6 +23,16 @@ jobs:
       with:
         dotnet-version: 9.0.x
 
+    - name: Get Current Interface Version from File
+      id: get-sync-version
+      shell: bash
+      run: |
+        if [ ! -f interface_version.txt ]; then
+        echo "1.0.0" > interface_version.txt
+        fi
+        CURRENT_INTERFACES_VERSION=$(cat interface_version.txt)
+        echo "CURRENT_INTERFACES_VERSION=$CURRENT_INTERFACES_VERSION" >> $GITHUB_ENV
+
     - name: Get Current Sync Version from File
       id: get-sync-version
       shell: bash
@@ -53,6 +63,15 @@ jobs:
         CURRENT_WEB_VERSION=$(cat web_version.txt)
         echo "CURRENT_WEB_VERSION=$CURRENT_WEB_VERSION" >> $GITHUB_ENV
 
+    - name: Increment Interfaces Version
+      id: increment-interfaces-version
+      shell: bash
+      run: |
+        IFS='.' read -r MAJOR MINOR PATCH <<< "${{ env.CURRENT_INTERFACES_VERSION }}"
+        PATCH=$((PATCH + 1))
+        NEW_INTERFACES_VERSION="$MAJOR.$MINOR.$PATCH"
+        echo "$NEW_INTERFACES_VERSION" > ./interface_version.txt  # Specify the file path explicitly
+        echo "NEW_INTERFACES_VERSION=$NEW_INTERFACES_VERSION" >> $GITHUB_ENV
     - name: Get Current Models Version from File
       id: get-models-version
       shell: bash
@@ -110,6 +129,13 @@ jobs:
         git add sync_core_service_models_version.txt
         git add sync_version.txt
         git add web_version.txt
+        git add interface_version.txt
+        git commit -m "Increment version to ${{ env.NEW_SYNC_VERSION }}"
+        git push --force
+
+    - name: Build interfaces project
+      run: dotnet build Common/MongoDB.Sync.Interfaces/MongoDB.Sync.Interfaces.csproj --configuration Release
+
         git add models_version.txt
         git commit -m "Increment version to ${{ env.NEW_SYNC_VERSION }}"
         git push --force
@@ -120,6 +146,8 @@ jobs:
     - name: Build web project
       run: dotnet build Common/MongoDB.Sync.Web/MongoDB.Sync.Web.csproj --configuration Release
 
+    - name: Pack interfaces NuGet package
+      run: dotnet pack Common/MongoDB.Sync.Interfaces/MongoDB.Sync.Interfaces.csproj --configuration Release --output Common/MongoDB.Sync.Interfaces/bin/Release /p:PackageVersion=${{ env.NEW_INTERFACES_VERSION }}
     - name: Build Models project
       run: dotnet build Common/MongoDB.Sync.Models/MongoDB.Sync.Models.csproj --configuration Release
 
@@ -135,6 +163,12 @@ jobs:
     - name: Pack web NuGet package
       run: dotnet pack Common/MongoDB.Sync.Web/MongoDB.Sync.Web.csproj --configuration Release --output Common/MongoDB.Sync.Web/bin/Release /p:PackageVersion=${{ env.NEW_WEB_VERSION }}
 
+    - name: Publish interfaces to NuGet
+      shell: pwsh
+      run: |
+        $files = Get-ChildItem -Path "Common/MongoDB.Sync.Interfaces/bin/Release" -Filter *.nupkg -Recurse
+        if ($files.Count -eq 0) {
+          throw "No .nupkg files found in Common/MongoDB.Sync.Interfaces/bin/Release"
     - name: Pack models NuGet package
       run: dotnet pack Common/MongoDB.Sync.Models/MongoDB.Sync.Models.csproj --configuration Release --output Common/MongoDB.Sync.Models/bin/Release /p:PackageVersion=${{ env.NEW_MODELS_VERSION }}
 
