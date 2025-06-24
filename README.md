@@ -24,7 +24,7 @@ This trigger listens to changes in MongoDB collections and forwards inserts, upd
   </summary>
 
 ``` json
-exports = async function (changeEvent) {
+    exports = async function (changeEvent) {
     const currentClusterName = "<<YOUR CLUSTER NAME HERE>>";
     const db = context.services.get(currentClusterName).db("AppServices");
     const appCollection = db.collection("SyncMappings");
@@ -106,39 +106,38 @@ exports = async function (changeEvent) {
         }
 
         // Handle document update
-        if (changeEvent.operationType === "update" && updatedFields) {
-            let filteredDocument = {};
-            matchingCollection.fields.forEach(field => {
-                if (updatedFields[field] !== undefined) {
-                    filteredDocument[field] = updatedFields[field];
+        if (changeEvent.operationType === "update") {
+          let filteredDocument = {};
+
+          matchingCollection.fields.forEach(field => {
+                if (fullDocument[field] !== undefined) {
+                    filteredDocument[field] = fullDocument[field];
                 }
             });
-
-            filteredDocument["_id"] = fullDocument._id;
-          
-            // If no relevant fields were updated, skip processing
-            if (Object.keys(filteredDocument).length === 0) {
-                console.log(`No relevant fields were updated for appId: ${appId}, database: ${databaseName}, and collection: ${collectionToUpdate}`);
-                continue;
-            }
-
-            filteredDocument["__meta"] = { "dateUpdated": new Date() };
-
-            await context.services.get(currentClusterName).db("AppServices").collection(collectionToUpdate).updateOne(
-                { _id: fullDocument._id },
-                { $set: filteredDocument },
-                { upsert: true }
-            );
-
-            // Send updated data to the app's endpoint
-            await sendToWebAPI({
-                action: "update",
-                collection: collectionName,
-                document: filteredDocument,
-                appId: appName,
-                database: databaseName
-            }, endpoint, bearerToken);
-        }
+      
+          // Always include _id
+          filteredDocument["_id"] = fullDocument._id;
+          filteredDocument["__meta"] = { "dateUpdated": new Date() };
+      
+          if (Object.keys(filteredDocument).length <= 2) { // _id and __meta don't count
+              console.log(`No relevant fields were updated for appId: ${appId}, database: ${databaseName}, and collection: ${collectionToUpdate}`);
+              continue;
+          }
+      
+          await context.services.get(currentClusterName).db("AppServices").collection(collectionToUpdate).updateOne(
+              { _id: fullDocument._id },
+              { $set: filteredDocument },
+              { upsert: true }
+          );
+      
+          await sendToWebAPI({
+              action: "update",
+              collection: collectionName,
+              document: filteredDocument,
+              appId: appName,
+              database: databaseName
+          }, endpoint, bearerToken);
+      }
     }
 };
 
@@ -161,9 +160,10 @@ async function sendToWebAPI(payload, endpoint, bearerToken) {
     if (response.statusCode < 200 || response.statusCode > 299) {
         console.log(`Failed to notify endpoint ${endpoint}. Status code: ${response.statusCode}. Content: ${JSON.stringify(payload)}`);
     } else {
-        console.log(`Successfully notified endpoint ${endpoint}.`);
+        console.log(`Successfully notified endpoint ${endpoint} of ${JSON.stringify(payload)}.`);
     }
 }
+
 
 ```
 </details>

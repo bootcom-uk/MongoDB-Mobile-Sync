@@ -3,6 +3,7 @@ using LiteDB;
 using Microsoft.Extensions.Logging;
 using MongoDB.Sync.Core.Services.Models.Models;
 using MongoDB.Sync.Core.Services.Models.Services;
+using MongoDB.Sync.LiteDb;
 using MongoDB.Sync.LocalDataCache;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
@@ -57,205 +58,19 @@ namespace MongoDB.Sync.Services
 
                        if(bson is null) return null;
 
+                       
                        var mappedType = _baseTypeResolverService.MappedTypes[type];
 
                         var item = Activator.CreateInstance(type);
 
-                        foreach (var kvp in (BsonDocument)bson)
-                        {
-                            var key = kvp.Key;
-                           if (key == "_id") key = "Id";
-                            var prpInfo = mappedType.FirstOrDefault(p => p.Name == key);
-                           if (prpInfo is not null)
-                           {
+                        return TypeProcessor.ProcessTypeForDeserialization(item, bson.AsDocument, _db);
 
-                               if (kvp.Value != null && kvp.Value.IsDocument && kvp.Value.AsDocument.Keys.Count == 1)
-                               {
-                                   var id = kvp.Value.AsDocument.First();
-                                   if (id.Value.IsString)
-                                   {
-                                       var collectionName = prpInfo.PropertyType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
-
-                                       var bsonObject = _db.GetCollection(collectionName).FindById(new ObjectId(id.Value.AsString));
-                                       var displayObject = BsonMapper.Global.Deserialize(prpInfo.PropertyType, bsonObject);
-
-                                       item!.GetType().GetProperty(key)?.SetValue(item, displayObject);
-                                       continue;
-                                   }
-                               }
-
-                               if (kvp.Value != null && kvp.Value.IsDocument)
-                               {
-                                   var prpName = prpInfo.Name;
-                               }
-
-                                   if (kvp.Value != null && kvp.Value.IsObjectId)
-                                {
-                                    var collectionName = prpInfo.PropertyType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
-                                    var bsonObject = _db.GetCollection(collectionName).FindById(kvp.Value.AsObjectId);
-
-                                   if (bsonObject is null) continue;
-
-                                   var displayObject = BsonMapper.Global.Deserialize(prpInfo.PropertyType, bsonObject);
-
-                                    item!.GetType().GetProperty(key)?.SetValue(item, displayObject);
-                                   continue;
-                               }                                
-                            }
-                           
-
-                            var propertyValue = kvp.Value;
-
-                           if (kvp.Value != null && kvp.Value.IsDocument)
-                           {
-                               var outputPropertyType = item!.GetType().GetProperty(kvp.Key)?.PropertyType;
-                               if(outputPropertyType is not null)
-                               {
-                                   var displayObject = BsonMapper.Global.Deserialize(outputPropertyType, kvp.Value);
-                                   item.GetType().GetProperty(key)?.SetValue(item, displayObject);
-                               }
-                               continue;
-                           }
-
-                           if (kvp.Value!.IsBoolean)
-                            {
-                                item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsBoolean);
-                                continue;
-                            }
-
-                            if (kvp.Value!.IsDateTime)
-                            {
-                                item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsDateTime);
-                                continue;
-                            }
-
-                           var propertyInfo = item.GetType().GetProperty(key);
-                           if (propertyInfo != null &&
-                               propertyInfo.PropertyType == typeof(ObjectId) &&
-                               kvp.Value != null &&
-                               kvp.Value.IsString)
-                           {
-                               propertyInfo.SetValue(item, new ObjectId(kvp.Value.AsString));
-                               continue;
-                           }
-
-                           if (propertyInfo != null &&
-                              propertyInfo.PropertyType != typeof(string) &&
-                              kvp.Value != null &&
-                              kvp.Value.IsString && !_baseTypeResolverService.MappedTypes.ContainsKey(propertyInfo.PropertyType)) 
-                           {
-                               propertyInfo.SetValue(item, Convert.ChangeType(kvp.Value.AsString, propertyInfo.PropertyType));
-                               continue;
-                           }
-
-                           if (kvp.Value!.IsString)
-                            {
-
-                                item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsString);
-                                continue;
-                            }
-
-                            if (kvp.Value!.IsInt32)
-                            {
-                                item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsInt32);
-                                continue;
-                            }
-
-                            if (kvp.Value.IsInt64)
-                            {
-                                item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsInt64);
-                                continue;
-                            }
-
-                            if (kvp.Value.IsDouble)
-                            {
-                                item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsDouble);
-                                continue;
-                            }
-
-                            if (kvp.Value.IsDecimal)
-                            {
-                                item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsDecimal);
-                                continue;
-                            }
-
-                            if (kvp.Value.IsGuid)
-                            {
-                                item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsGuid);
-                                continue;
-                            }
-
-                            if (kvp.Value.IsObjectId)
-                            {
-                                item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsObjectId);
-                                continue;
-                            }
-
-                            if (kvp.Value.IsArray)
-                            {
-
-                               if (prpInfo?.PropertyType is null || prpInfo?.PropertyType?.GenericTypeArguments is null || prpInfo?.PropertyType?.GenericTypeArguments.Count() == 0) continue;
-
-                                var listType = typeof(List<>).MakeGenericType(prpInfo?.PropertyType?.GenericTypeArguments[0]!);
-
-                               if(listType is null)
-                               {
-                                   continue;
-                               }
-
-                               var list = (IList?)Activator.CreateInstance(listType);
-                               if(list is null) continue;
-
-                               foreach (var itemValue in kvp.Value.AsArray)
-                                {
-                                    var collectionName = prpInfo!.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
-                                    var displayObject = _db.GetCollection(collectionName).FindById(itemValue.ToString());
-                                    list.Add(displayObject);
-                                }
-                                item!.GetType().GetProperty(key)?.SetValue(item, list);
-                                continue;
-                            }
-
-                            if (kvp.Value.IsObjectId)
-                            {
-                                item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value.AsObjectId);
-                                continue;
-                            }
-
-                            if (kvp.Value.IsNull)
-                            {
-                                item!.GetType().GetProperty(key)?.SetValue(item, null);
-                                continue;
-                            }
-
-                            item!.GetType().GetProperty(key)?.SetValue(item, kvp.Value);
-                        }
-
-                        return item;
                     }, 
                     serialize :(item) => {
-                        var document = new BsonDocument();
 
-                        foreach (var prpInfo in item.GetType().GetProperties())
-                        {
-
-                            if (prpInfo.Name == "Id")
-                            {
-                                document.Add("_id", BsonMapper.Global.Serialize(prpInfo.GetValue(item)));
-                                continue;
-                            }
-
-                            if (typeof(BaseLocalCacheModel).IsAssignableFrom(prpInfo.PropertyType))
-                            {                              
-                                var underlyingObject = (BaseLocalCacheModel?) prpInfo.GetValue(item);
-                                if (underlyingObject is null) continue;
-                                document.Add(prpInfo.Name, underlyingObject.Id);
-                                continue;
-                            }
-                            document.Add(prpInfo.Name, BsonMapper.Global.Serialize(prpInfo.GetValue(item)));
-                        }
-
-                        return document;
+                        var serializedItem = TypeProcessor.ProcessTypeForSerialization(item);
+                        return serializedItem;
+ 
                     });
             }
             
@@ -277,6 +92,13 @@ namespace MongoDB.Sync.Services
         public LiveQueryableLiteCollection<T> GetLiveCollection<T>(string name, Func<T, bool>? filter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? order = null) where T : BaseLocalCacheModel
         {
             return new LiveQueryableLiteCollection<T>(_messenger, _db, name, filter, order);
+        }
+
+        public async Task<LiveQueryableLiteCollectionAsync<T>> GetLiveCollectionAsync<T>(string name, Func<T, bool>? filter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? order = null) where T : BaseLocalCacheModel
+        {
+            var collection = new LiveQueryableLiteCollectionAsync<T>(_messenger, _db, name, filter, order);
+            await collection.ReloadDataAsync();
+            return collection;
         }
 
         private Queue<SyncLocalCacheDataChange> _changesToProcess = new();

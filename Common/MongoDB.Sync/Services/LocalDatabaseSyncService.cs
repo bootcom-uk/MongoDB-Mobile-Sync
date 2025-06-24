@@ -8,6 +8,7 @@ using MongoDB.Sync.Models.Attributes;
 using System.Collections;
 using System.Reflection;
 using System.Reflection.Metadata;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace MongoDB.Sync.Services
@@ -160,7 +161,10 @@ namespace MongoDB.Sync.Services
 
             if (updateData is null || updateData.Document is null) return;
 
-            var doc = LiteDB.JsonSerializer.Deserialize(updateData.Document.ToString()).AsDocument;
+            // var doc = LiteDB.JsonSerializer.Deserialize(updateData.Document.ToString()).AsDocument;
+            var jsonDoc = System.Text.Json.JsonSerializer.Deserialize<JsonElement>(updateData.Document);
+
+            var doc = EjsonConverter.NormalizeEjson(jsonDoc);
 
             if (doc is null) return;
 

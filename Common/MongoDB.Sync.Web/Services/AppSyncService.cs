@@ -32,6 +32,9 @@ namespace MongoDB.Sync.Web.Services
 
         public async Task<AppSyncMapping?> SaveAppSyncMapping(AppSyncMapping appSyncMapping)
         {
+
+            await _appServicesDb.CreateCollectionAsync("SyncMappings");
+
             var appCollection = _appServicesDb.GetCollection<AppSyncMapping>("SyncMappings");
 
             var hasVersionChanged = false;
