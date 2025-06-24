@@ -290,6 +290,9 @@ namespace MongoDB.Sync.Services
 
             await StartSignalRAsync();
 
+            _syncIsStarting = false;
+            _syncHasStarted = true;
+
             return;
         }
 
