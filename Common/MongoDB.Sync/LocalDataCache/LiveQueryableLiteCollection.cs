@@ -23,6 +23,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
 
     private bool _suspendNotifications = false;
     private readonly Dictionary<Type, string> _usedCollections = new();
+    private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
     public LiveQueryableLiteCollection(
         IMessenger messenger,
@@ -45,122 +46,126 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
             if (attr != null)
                 _usedCollections.TryAdd(prpInfo.PropertyType, attr.CollectionName);
         }
-        
+
         _messenger.Register<DatabaseChangeMessage>(this, OnDatabaseChanged);
 
-        Refresh();
+        _ = RefreshAsync(); // Fire and forget
     }
 
-    public async void Refresh() => await ReloadData();
+    public Task RefreshAsync() => ReloadDataAsync();
 
-    private async Task ReloadData()
+    private async Task ReloadDataAsync()
     {
-        BeginBatchUpdate();
+        await _refreshLock.WaitAsync();
 
-        var query = _collection.FindAll().AsQueryable();
-        if (_filter != null) query = query.Where(_filter).AsQueryable();
-        if (_order != null) query = _order(query);
-
-        var items = query.ToList();
-
-        await MainThread.InvokeOnMainThreadAsync(() =>
+        try
         {
-            ReplaceAll(items);
-        });
+            var query = _collection.FindAll().AsQueryable();
+            if (_filter != null) query = query.Where(_filter).AsQueryable();
+            if (_order != null) query = _order(query);
 
-        EndBatchUpdate();
-    }
+            var items = query.ToList();
 
-    private void ReplaceAll(IEnumerable<T> newItems)
-    {
-        ClearItemsWithoutNotify();
+            await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                SuspendNotifications(() =>
+                {
+                    ClearItems();
+                    foreach (var item in items)
+                        Add(item);
+                });
 
-        foreach (var item in newItems)
+                RaiseReset();
+            });
+        }
+        finally
         {
-            base.InsertItem(Count, item);
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item));
+            _refreshLock.Release();
         }
     }
 
-    private void ClearItemsWithoutNotify()
+    private void SuspendNotifications(Action action)
     {
         _suspendNotifications = true;
-        base.ClearItems();
-        _suspendNotifications = false;
+        try { action(); }
+        finally { _suspendNotifications = false; }
     }
 
-    private void ProcessDatabaseChange( DatabaseChangeMessage message)
+    private void RaiseReset()
+    {
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+    }
+
+    private void OnDatabaseChanged(object recipient, DatabaseChangeMessage message)
+    {
+        // Queue to background, then post result to UI thread in batch
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await ProcessDatabaseChangeAsync(message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Database change processing failed: " + ex);
+            }
+        });
+    }
+
+    private async Task ProcessDatabaseChangeAsync(DatabaseChangeMessage message)
     {
         if (!_usedCollections.Values.Contains(message.Value.CollectionName)) return;
 
-        BeginBatchUpdate();
-
         if (message.Value.IsDeleted)
         {
-            var toRemove = this.FirstOrDefault(x => x.Id == message.Value.Id);
-            if (toRemove != null)
-                Remove(toRemove);
-            EndBatchUpdate();
+            var itemToRemove = this.FirstOrDefault(x => x.Id == message.Value.Id);
+            if (itemToRemove != null)
+            {
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    Remove(itemToRemove);
+                    ItemChanged?.Invoke(this, new(ItemChangedEventArgs<T>.CollectionChangeType.Removed, itemToRemove));
+                });
+            }
             return;
         }
 
         if (message.Value.CollectionName != _collection.Name)
         {
             HandleLinkedCollectionUpdate(message);
-            EndBatchUpdate();
             return;
         }
 
         var updated = _collection.FindById(new ObjectId(message.Value.Id));
-        if (updated == null)
+        if (updated == null) return;
+
+        await MainThread.InvokeOnMainThreadAsync(() =>
         {
-            EndBatchUpdate();
-            return;
-        }
-
-        var existing = this.FirstOrDefault(x => x.Id == updated.Id);
-
-        if (existing == null)
-        {
-            if (_filter != null && !_filter(updated)) { EndBatchUpdate(); return; }
-            Add(updated);
-            EndBatchUpdate();
-            return;
-        }
-
-        foreach (var prop in typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance))
-        {
-            var newValue = prop.GetValue(updated);
-            prop.SetValue(existing, newValue);
-        }
-
-        if (_filter != null && !_filter(existing))
-        {
-            Remove(existing);
-            EndBatchUpdate();
-            return;
-        }
-
-        ItemChanged?.Invoke(this, new ItemChangedEventArgs<T>(ItemChangedEventArgs<T>.CollectionChangeType.Updated, existing));
-        EndBatchUpdate();
-    }
-
-    private void OnDatabaseChanged(object recipient, DatabaseChangeMessage message)
-    {
-
-        MainThread.BeginInvokeOnMainThread(() =>
-        {
-            try
+            var existing = this.FirstOrDefault(x => x.Id == updated.Id);
+            if (existing == null)
             {
-                ProcessDatabaseChange(message);
+                if (_filter != null && !_filter(updated)) return;
+                Add(updated);
+                ItemChanged?.Invoke(this, new(ItemChangedEventArgs<T>.CollectionChangeType.Added, updated));
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine("OnDatabaseChanged crash: " + ex);
+                foreach (var prop in typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                {
+                    var newVal = prop.GetValue(updated);
+                    prop.SetValue(existing, newVal);
+                }
+
+                if (_filter != null && !_filter(existing))
+                {
+                    Remove(existing);
+                    ItemChanged?.Invoke(this, new(ItemChangedEventArgs<T>.CollectionChangeType.Removed, existing));
+                    return;
+                }
+
+                ItemChanged?.Invoke(this, new(ItemChangedEventArgs<T>.CollectionChangeType.Updated, existing));
             }
         });
-
-        
     }
 
     private void HandleLinkedCollectionUpdate(DatabaseChangeMessage message)
@@ -168,98 +173,32 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
         foreach (var prop in typeof(T).GetProperties())
         {
             var attr = prop.PropertyType.GetCustomAttribute<CollectionNameAttribute>();
-            if (attr == null || attr.CollectionName != message.Value.CollectionName) continue;
+            if (attr?.CollectionName != message.Value.CollectionName) continue;
 
             var subCol = _db.GetCollection(attr.CollectionName);
             var updatedSub = subCol.FindById(new ObjectId(message.Value.Id));
             var subObj = BsonMapper.Global.Deserialize(prop.PropertyType, updatedSub);
 
-            foreach (var record in this)
+            MainThread.BeginInvokeOnMainThread(() =>
             {
-                var linkedObj = prop.GetValue(record);
-                var linkedIdProp = linkedObj?.GetType().GetProperty("Id");
-
-                if (linkedIdProp?.GetValue(linkedObj) is ObjectId linkedId &&
-                    linkedId == message.Value.Id)
+                foreach (var record in this)
                 {
-                    prop.SetValue(record, subObj);
-                    ItemChanged?.Invoke(this, new ItemChangedEventArgs<T>(ItemChangedEventArgs<T>.CollectionChangeType.Updated, record));
+                    var linkedObj = prop.GetValue(record);
+                    var linkedId = linkedObj?.GetType().GetProperty("Id")?.GetValue(linkedObj);
+
+                    if (linkedId?.Equals(message.Value.Id) == true)
+                    {
+                        prop.SetValue(record, subObj);
+                        ItemChanged?.Invoke(this, new(ItemChangedEventArgs<T>.CollectionChangeType.Updated, record));
+                    }
                 }
-            }
-        }
-    }
-
-    private void BeginBatchUpdate()
-    {
-        _suspendNotifications = true;
-    }
-
-    private void EndBatchUpdate()
-    {
-        _suspendNotifications = false;
-        ReapplySort();
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-    }
-
-    private void ReapplySort()
-    {
-        if (_order == null) return;
-
-        var sorted = _order(this.AsQueryable()).ToList();
-
-        for (int targetIndex = 0; targetIndex < sorted.Count; targetIndex++)
-        {
-            var item = sorted[targetIndex];
-            var currentIndex = IndexOf(item);
-
-            if (currentIndex != targetIndex && currentIndex >= 0)
-            {
-                Move(currentIndex, targetIndex);
-            }
+            });
         }
     }
 
     protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
-        if (_suspendNotifications)
-            return;
-                
+        if (_suspendNotifications) return;
         base.OnCollectionChanged(e);
-    }
-
-    protected override void ClearItems()
-    {
-        if (_suspendNotifications)
-        {
-            Items.Clear();
-            return;
-        }
-        base.ClearItems();
-    }
-
-    protected override void InsertItem(int index, T item)
-    {
-        if (_suspendNotifications)
-        {
-            base.InsertItem(index, item);
-            return;
-        }
-
-        base.InsertItem(index, item);
-        ItemChanged?.Invoke(this, new ItemChangedEventArgs<T>(ItemChangedEventArgs<T>.CollectionChangeType.Added, item));
-    }
-
-    protected override void RemoveItem(int index)
-    {
-        var item = this[index];
-
-        if (_suspendNotifications)
-        {
-            Items.RemoveAt(index);
-            return;
-        }
-
-        base.RemoveItem(index);
-        ItemChanged?.Invoke(this, new ItemChangedEventArgs<T>(ItemChangedEventArgs<T>.CollectionChangeType.Removed, item));
     }
 }
