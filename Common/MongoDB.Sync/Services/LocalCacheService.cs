@@ -9,7 +9,6 @@ using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
 using Services;
-using System.Collections;
 using System.Data;
 using System.Reflection;
 

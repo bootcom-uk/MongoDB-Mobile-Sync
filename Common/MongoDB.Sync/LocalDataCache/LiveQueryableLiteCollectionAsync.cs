@@ -8,7 +8,6 @@ using MongoDB.Sync.Models.Attributes;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Reflection;
-using System.Threading;
 
 namespace MongoDB.Sync.LocalDataCache;
 
