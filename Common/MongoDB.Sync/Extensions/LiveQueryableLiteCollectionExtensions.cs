@@ -1,7 +1,6 @@
 ﻿using MongoDB.Sync.Core.Services.Models.Models;
 using MongoDB.Sync.LocalDataCache;
 
-
 namespace MongoDB.Sync.Extensions
 {
     public static class LiveQueryableLiteCollectionExtensions
