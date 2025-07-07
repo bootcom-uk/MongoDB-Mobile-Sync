@@ -21,12 +21,12 @@
 
 	<ItemGroup>
 		<PackageReference Include="BootCom-Maui-Shared-Services" Version="1.2.16" />
-		<PackageReference Include="BootCom-MongoDB-Sync" Version="1.1.116" />
-		<PackageReference Include="BootCom-MongoDB-Sync-Core-Services-Models" Version="1.0.150" />
+		<PackageReference Include="BootCom-MongoDB-Sync" Version="1.2.1" />
+		<PackageReference Include="BootCom-MongoDB-Sync-Core-Services-Models" Version="1.2.1" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.6.0" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.80" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.80" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.81" />
+		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.81" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 	</ItemGroup>
 
