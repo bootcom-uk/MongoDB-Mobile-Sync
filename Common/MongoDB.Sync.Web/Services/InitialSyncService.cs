@@ -100,6 +100,14 @@ namespace MongoDB.Sync.Web.Services
 
             var targetCollection = targetDb.GetCollection<BsonDocument>(targetCollectionName);
 
+
+            // Create index on __meta.dateUpdated
+            var indexKeys = Builders<BsonDocument>.IndexKeys.Ascending("__meta.dateUpdated");
+            var indexModel = new CreateIndexModel<BsonDocument>(indexKeys);
+            await targetCollection.Indexes.CreateOneAsync(indexModel);
+
+            _logger.LogInformation($"Created index on __meta.dateUpdated in collection {targetCollectionName}.");
+
             _logger.LogInformation($"Starting sync for collection {collectionName} in database {dbName} for app {appMapping.AppId}.");
 
             // Paginate the documents to avoid memory overflow during large syncs
