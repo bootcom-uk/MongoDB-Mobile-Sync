@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Sync.Models.Web;
 using MongoDB.Sync.Web.Interfaces;
 using MongoDB.Sync.Web.Models.SyncModels;
 using System.Runtime.InteropServices;
@@ -205,6 +206,34 @@ namespace MongoDB.Sync.Web.Services
             // Implement logic to check if the user has permission to access this app
             return true; // Assume they have permission for now
         }
+
+        private IMongoCollection<BsonDocument> GetCollection(string appName, string databaseName, string collectionName)
+        {
+            var fullCollectionName = $"{appName}_{collectionName}";
+            var db = _appServicesDb.Client.GetDatabase("AppServices");
+            return db.GetCollection<BsonDocument>(fullCollectionName);
+        }
+
+        public async Task<List<WebSyncCollectionUpdateStatus>> CheckForCollectionUpdatesAsync(string appName, string userId, List<WebSyncCollectionInfo> localState)
+        {
+
+            var tasks = localState.Select(async info =>
+            {
+                var collection = GetCollection(appName, info.DatabaseName, info.CollectionName); // Custom method
+                var filter = Builders<BsonDocument>.Filter.Gt("__meta.dateUpdated", info.LastSyncDate);
+                var count = await collection.CountDocumentsAsync(filter);
+
+                return new WebSyncCollectionUpdateStatus
+                {
+                    DatabaseName = info.DatabaseName,
+                    CollectionName = info.CollectionName,
+                    RecordsToDownload = (int)count
+                };
+            });
+
+            return (await Task.WhenAll(tasks)).ToList();
+        }
+
 
         public async Task<SyncResult> SyncAppDataAsync(
     string appName,
