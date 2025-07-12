@@ -247,10 +247,10 @@ namespace MongoDB.Sync.Web.Services
                     if (localMap.TryGetValue(key, out var localInfo))
                     {
                         // Version mismatch?
-                        //if (localInfo.CollectionVersion != serverCollection.Version)
-                        //{
-                        //    forceResync = true;
-                        //}
+                        if (localInfo.CollectionVersion != serverCollection.Version)
+                        {
+                            forceResync = true;
+                        }
 
                         // Count only if version is fine
                         if (!forceResync)
