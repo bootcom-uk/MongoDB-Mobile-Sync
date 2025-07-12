@@ -1,4 +1,5 @@
-﻿using MongoDB.Sync.Web.Models.SyncModels;
+﻿using MongoDB.Sync.Models.Web;
+using MongoDB.Sync.Web.Models.SyncModels;
 
 namespace MongoDB.Sync.Web.Interfaces
 {
@@ -26,5 +27,11 @@ namespace MongoDB.Sync.Web.Interfaces
     DateTime? lastSyncDate = null);
 
         Task<AppSyncMapping?> GetAppInformation(string appName);
+
+        Task<List<WebSyncCollectionUpdateStatus>> CheckForCollectionUpdatesAsync(
+    string appName,
+    string userId,
+    List<WebSyncCollectionInfo> localState);
+
     }
 }
