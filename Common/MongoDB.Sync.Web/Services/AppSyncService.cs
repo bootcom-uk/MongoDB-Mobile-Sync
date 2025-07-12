@@ -4,6 +4,7 @@ using MongoDB.Driver;
 using MongoDB.Sync.Models.Web;
 using MongoDB.Sync.Web.Interfaces;
 using MongoDB.Sync.Web.Models.SyncModels;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 
@@ -214,25 +215,100 @@ namespace MongoDB.Sync.Web.Services
             return db.GetCollection<BsonDocument>(fullCollectionName);
         }
 
-        public async Task<List<WebSyncCollectionUpdateStatus>> CheckForCollectionUpdatesAsync(string appName, string userId, List<WebSyncCollectionInfo> localState)
+        public async Task<List<WebSyncCollectionUpdateStatus>> CheckForCollectionUpdatesAsync(
+    string appName,
+    string userId,
+    List<WebSyncCollectionInfo> localState)
         {
+            var maxConcurrency = 10;
+            using var throttler = new SemaphoreSlim(maxConcurrency);
 
-            var tasks = localState.Select(async info =>
+            // Get all configured collections for this app (from syncmappings)
+            var allMappings = await GetAppSyncMappings();
+            var serverMappings = allMappings.FirstOrDefault(record => record.AppName == appName);
+            
+            var result = new ConcurrentBag<WebSyncCollectionUpdateStatus>();
+
+            var localMap = localState.ToDictionary(
+                x => $"{x.DatabaseName}.{x.CollectionName}",
+                x => x,
+                StringComparer.OrdinalIgnoreCase);
+
+            var tasks = serverMappings.Collections.Select(async serverCollection =>
             {
-                var collection = GetCollection(appName, info.DatabaseName, info.CollectionName); // Custom method
-                var filter = Builders<BsonDocument>.Filter.Gt("__meta.dateUpdated", info.LastSyncDate);
-                var count = await collection.CountDocumentsAsync(filter);
+                var key = $"{serverCollection.DatabaseName}.{serverCollection.CollectionName}";
 
-                return new WebSyncCollectionUpdateStatus
+                await throttler.WaitAsync();
+                try
                 {
-                    DatabaseName = info.DatabaseName,
-                    CollectionName = info.CollectionName,
-                    RecordsToDownload = (int)count
-                };
+                    var forceResync = false;
+                    var recordsToDownload = 0;
+
+                    if (localMap.TryGetValue(key, out var localInfo))
+                    {
+                        // Version mismatch?
+                        //if (localInfo.CollectionVersion != serverCollection.Version)
+                        //{
+                        //    forceResync = true;
+                        //}
+
+                        // Count only if version is fine
+                        if (!forceResync)
+                        {
+                            var collection = GetCollection(appName, serverCollection.DatabaseName, serverCollection.CollectionName);
+                            var filter = Builders<BsonDocument>.Filter.Gt("__meta.dateUpdated", localInfo.LastSyncDate);
+                            recordsToDownload = (int)await collection.CountDocumentsAsync(filter);
+                        }
+                    }
+                    else
+                    {
+                        // New collection not present on device — full count
+                        var collection = GetCollection(appName, serverCollection.DatabaseName, serverCollection.CollectionName);
+                        var count = (int)await collection.CountDocumentsAsync(new BsonDocument());
+                        recordsToDownload = count;
+                        forceResync = true; // new to device
+                    }
+
+                    result.Add(new WebSyncCollectionUpdateStatus
+                    {
+                        DatabaseName = serverCollection.DatabaseName,
+                        CollectionName = serverCollection.CollectionName,
+                        RecordsToDownload = recordsToDownload,
+                       // ForceFullResync = forceResync,
+                       // ShouldRemoveLocally = false
+                    });
+                }
+                finally
+                {
+                    throttler.Release();
+                }
             });
 
-            return (await Task.WhenAll(tasks)).ToList();
+            // Now handle client collections that are no longer in server config
+            var validKeys = new HashSet<string>(
+                serverMappings.Collections.Select(c => $"{c.DatabaseName}.{c.CollectionName}"),
+                StringComparer.OrdinalIgnoreCase);
+
+            var removed = localState
+                .Where(local => !validKeys.Contains($"{local.DatabaseName}.{local.CollectionName}"))
+                .Select(local => new WebSyncCollectionUpdateStatus
+                {
+                    DatabaseName = local.DatabaseName,
+                    CollectionName = local.CollectionName,
+                    RecordsToDownload = 0,
+                    //ShouldRemoveLocally = true,
+                    //ForceFullResync = false
+                });
+
+            await Task.WhenAll(tasks);
+            foreach (var r in removed)
+            {
+                result.Add(r);
+            }
+
+            return result.ToList();
         }
+
 
 
         public async Task<SyncResult> SyncAppDataAsync(
