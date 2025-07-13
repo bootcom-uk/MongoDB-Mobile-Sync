@@ -93,26 +93,45 @@ namespace MongoDB.Sync.Services
             _appDetails = _localDatabaseService.GetAppMapping();
             if (_appDetails is null) throw new NullReferenceException(nameof(_appDetails));
 
-            var syncTasks = _appDetails.Collections
-                .Select(ProcessCollectionUpdate); // starts all tasks
+            var serverAppInfo = await GetAppInformation();
+            if (serverAppInfo is null) throw new Exception("Failed to get remote app mapping.");
 
-            await Task.WhenAll(syncTasks); // waits for all to complete
+            // Cleanup: Remove local collections no longer in the remote config
+            var localCollectionKeys = _appDetails.Collections
+                .Select(c => $"{c.DatabaseName}.{c.CollectionName}")
+                .ToHashSet();
 
+            var serverCollectionKeys = serverAppInfo.Collections
+                .Select(c => $"{c.DatabaseName}.{c.CollectionName}")
+                .ToHashSet();
+
+            var collectionsToRemove = localCollectionKeys.Except(serverCollectionKeys);
+            foreach (var key in collectionsToRemove)
+            {
+                var parts = key.Split('.');                
+                _localDatabaseService.ClearCollection($"{parts[0]}_{parts[1]}".Replace("-", "_"));
+            }
+
+            var tasks = serverAppInfo.Collections.Select(async serverCollection =>
+            {
+                var key = $"{serverCollection.DatabaseName}.{serverCollection.CollectionName}";
+                var localCollection = _appDetails.Collections.FirstOrDefault(c =>
+                    c.DatabaseName == serverCollection.DatabaseName &&
+                    c.CollectionName == serverCollection.CollectionName);
+
+                // Check version mismatch: Drop and recreate if needed
+                if (localCollection == null || localCollection.Version != serverCollection.Version)
+                {
+                    _localDatabaseService.ClearCollection($"{serverCollection.DatabaseName}_{serverCollection.CollectionName}".Replace("-", "_"));
+                }
+
+               if(localCollection is not null) await ProcessCollectionUpdate(localCollection);
+            });
+
+            await Task.WhenAll(tasks);
             _localDatabaseService.InitialSyncComplete();
         }
 
-        //private async Task PerformAPISync()
-        //{
-        //    _appDetails = _localDatabaseService.GetAppMapping();
-        //    if (_appDetails is null) throw new NullReferenceException(nameof(_appDetails));
-
-        //    foreach (var item in _appDetails.Collections)
-        //    {
-        //        await ProcessCollectionUpdate(item);
-        //    }
-
-        //    _localDatabaseService.InitialSyncComplete();
-        //}
 
         public async Task ProcessCollectionUpdate(CollectionMapping item)
         {
