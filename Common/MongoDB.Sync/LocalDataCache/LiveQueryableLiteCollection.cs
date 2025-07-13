@@ -7,7 +7,7 @@ using MongoDB.Sync.Models.Attributes;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Reflection;
-using System.Threading.Tasks;
+using System.Threading.Channels;
 
 namespace MongoDB.Sync.LocalDataCache;
 
@@ -21,9 +21,12 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
     private readonly Func<T, bool>? _filter;
     private readonly Func<IQueryable<T>, IOrderedQueryable<T>>? _order;
 
-    private bool _suspendNotifications = false;
-    private readonly Dictionary<Type, string> _usedCollections = new();
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
+    private readonly Dictionary<Type, string> _usedCollections = new();
+    private readonly Channel<DatabaseChangeMessage> _changeQueue = Channel.CreateUnbounded<DatabaseChangeMessage>();
+
+    private bool _suspendNotifications;
+    private static readonly PropertyInfo[] _props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
     public LiveQueryableLiteCollection(
         IMessenger messenger,
@@ -40,16 +43,16 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
 
         _usedCollections.TryAdd(typeof(T), collectionName);
 
-        foreach (var prpInfo in typeof(T).GetProperties())
+        foreach (var prop in typeof(T).GetProperties())
         {
-            var attr = prpInfo.PropertyType.GetCustomAttribute<CollectionNameAttribute>();
+            var attr = prop.PropertyType.GetCustomAttribute<CollectionNameAttribute>();
             if (attr != null)
-                _usedCollections.TryAdd(prpInfo.PropertyType, attr.CollectionName);
+                _usedCollections.TryAdd(prop.PropertyType, attr.CollectionName);
         }
 
-        _messenger.Register<DatabaseChangeMessage>(this, OnDatabaseChanged);
-
-        _ = RefreshAsync(); // Fire and forget
+        _messenger.Register<DatabaseChangeMessage>(this, (_, message) => _changeQueue.Writer.TryWrite(message));
+        _ = Task.Run(ProcessQueueAsync);
+        _ = RefreshAsync();
     }
 
     public Task RefreshAsync() => ReloadDataAsync();
@@ -60,29 +63,40 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
 
         try
         {
-            var query = _collection.FindAll().AsQueryable();
-            if (_filter != null) query = query.Where(_filter).AsQueryable();
-            if (_order != null) query = _order(query);
+            var query = _collection.FindAll();
 
-            var items = query.ToList();
+            if (_filter != null)
+                query = query.Where(_filter);
+
+            var items = _order != null
+                ? _order(query.AsQueryable())
+                : query;
 
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
                 SuspendNotifications(() =>
                 {
                     ClearItems();
-                    foreach (var item in items)
-                        Add(item);
                 });
-
-                RaiseReset();
             });
+
+            foreach (var item in items)
+            {
+                await MainThread.InvokeOnMainThreadAsync(async () =>
+                {
+                    Add(item);
+                    await Task.Delay(1);
+                });
+            }
+
+            await MainThread.InvokeOnMainThreadAsync(RaiseReset);
         }
         finally
         {
             _refreshLock.Release();
         }
     }
+
 
     private void SuspendNotifications(Action action)
     {
@@ -96,10 +110,9 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
         OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
 
-    private void OnDatabaseChanged(object recipient, DatabaseChangeMessage message)
+    private async Task ProcessQueueAsync()
     {
-        // Queue to background, then post result to UI thread in batch
-        _ = Task.Run(async () =>
+        await foreach (var message in _changeQueue.Reader.ReadAllAsync())
         {
             try
             {
@@ -109,7 +122,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
             {
                 Console.WriteLine("Database change processing failed: " + ex);
             }
-        });
+        }
     }
 
     private async Task ProcessDatabaseChangeAsync(DatabaseChangeMessage message)
@@ -132,25 +145,26 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
 
         if (message.Value.CollectionName != _collection.Name)
         {
-            HandleLinkedCollectionUpdate(message);
+            await Task.Run(() => HandleLinkedCollectionUpdate(message));
             return;
         }
 
         var updated = _collection.FindById(new ObjectId(message.Value.Id));
         if (updated == null) return;
 
-        await MainThread.InvokeOnMainThreadAsync(() =>
+        await MainThread.InvokeOnMainThreadAsync(async () =>
         {
             var existing = this.FirstOrDefault(x => x.Id == updated.Id);
             if (existing == null)
             {
                 if (_filter != null && !_filter(updated)) return;
                 Add(updated);
+                await Task.Delay(1);
                 ItemChanged?.Invoke(this, new(ItemChangedEventArgs<T>.CollectionChangeType.Added, updated));
             }
             else
             {
-                foreach (var prop in typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                foreach (var prop in _props)
                 {
                     var newVal = prop.GetValue(updated);
                     prop.SetValue(existing, newVal);
