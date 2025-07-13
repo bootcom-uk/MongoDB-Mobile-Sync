@@ -122,7 +122,7 @@ namespace MongoDB.Sync.Web.Services
                     .Skip(batch * batchSize)
                     .SortByDescending(record => record["_id"]) // Ensure consistent ordering
                     .Limit(batchSize)
-                .ToListAsync();
+                    .ToListAsync();
 
                 var filteredDocuments = new List<BsonDocument>();
 

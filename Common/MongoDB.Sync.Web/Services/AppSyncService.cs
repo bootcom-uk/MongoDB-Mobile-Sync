@@ -14,7 +14,7 @@ namespace MongoDB.Sync.Web.Services
     {
         private readonly IMongoDatabase _appServicesDb;
         private readonly ILogger<AppSyncService> _logger;
-        private const int BatchSize = 100; // Define your batch size
+        private const int BatchSize = 500; // Define your batch size
         private readonly IMongoClient _mongoClient;
         private readonly InitialSyncService _initialSyncService;
 

@@ -91,12 +91,13 @@ namespace MongoDB.Sync.Services
         private async Task PerformAPISync()
         {
             _appDetails = _localDatabaseService.GetAppMapping();
-            if (_appDetails is null) throw new NullReferenceException(nameof(_appDetails));
+            if (_appDetails is null)
+                throw new NullReferenceException(nameof(_appDetails));
 
             var serverAppInfo = await GetAppInformation();
-            if (serverAppInfo is null) throw new Exception("Failed to get remote app mapping.");
+            if (serverAppInfo is null)
+                throw new Exception("Failed to get remote app mapping.");
 
-            // Cleanup: Remove local collections no longer in the remote config
             var localCollectionKeys = _appDetails.Collections
                 .Select(c => $"{c.DatabaseName}.{c.CollectionName}")
                 .ToHashSet();
@@ -108,29 +109,40 @@ namespace MongoDB.Sync.Services
             var collectionsToRemove = localCollectionKeys.Except(serverCollectionKeys);
             foreach (var key in collectionsToRemove)
             {
-                var parts = key.Split('.');                
+                var parts = key.Split('.');
                 _localDatabaseService.ClearCollection($"{parts[0]}_{parts[1]}".Replace("-", "_"));
             }
 
-            var tasks = serverAppInfo.Collections.Select(async serverCollection =>
+            int maxConcurrency = 5;
+            using var throttler = new SemaphoreSlim(maxConcurrency);
+
+            var syncTasks = serverAppInfo.Collections.Select(async serverCollection =>
             {
-                var key = $"{serverCollection.DatabaseName}.{serverCollection.CollectionName}";
-                var localCollection = _appDetails.Collections.FirstOrDefault(c =>
-                    c.DatabaseName == serverCollection.DatabaseName &&
-                    c.CollectionName == serverCollection.CollectionName);
-
-                // Check version mismatch: Drop and recreate if needed
-                if (localCollection == null || localCollection.Version != serverCollection.Version)
+                await throttler.WaitAsync();
+                try
                 {
-                    _localDatabaseService.ClearCollection($"{serverCollection.DatabaseName}_{serverCollection.CollectionName}".Replace("-", "_"));
-                }
+                    var localCollection = _appDetails.Collections.FirstOrDefault(c =>
+                        c.DatabaseName == serverCollection.DatabaseName &&
+                        c.CollectionName == serverCollection.CollectionName);
 
-               if(localCollection is not null) await ProcessCollectionUpdate(localCollection);
+                    if (localCollection == null || localCollection.Version != serverCollection.Version)
+                    {
+                        _localDatabaseService.ClearCollection($"{serverCollection.DatabaseName}_{serverCollection.CollectionName}".Replace("-", "_"));
+                    }
+
+                    await ProcessCollectionUpdate(serverCollection);
+                }
+                finally
+                {
+                    throttler.Release();
+                }
             });
 
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(syncTasks);
+
             _localDatabaseService.InitialSyncComplete();
         }
+
 
 
         public async Task ProcessCollectionUpdate(CollectionMapping item)
