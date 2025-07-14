@@ -2,6 +2,7 @@
 using LiteDB;
 using MongoDB.Sync.Converters;
 using MongoDB.Sync.Core.Services.Models.Services;
+using MongoDB.Sync.LiteDb;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using System.Text.Json;
@@ -19,8 +20,12 @@ namespace MongoDB.Sync.Services
 
         private readonly BaseTypeResolverService _baseTypeResolverService;
 
+        private readonly LiteDbQueueProcessor _liteDbQueueProcessor;
+
         public LocalDatabaseSyncService(IMessenger messenger, string liteDbPath, BaseTypeResolverService baseTypeResolverService) {
             LiteDb = new LiteDatabase(liteDbPath);
+            _liteDbQueueProcessor = new(LiteDb);
+
             _messenger = messenger;
             _baseTypeResolverService = baseTypeResolverService;
 
@@ -151,68 +156,49 @@ namespace MongoDB.Sync.Services
             appsCollection.Update(appRecord);
         }
 
-        private void HandleAPISyncMessageReceived(object recipient, APISyncMessageReceived message) {
-            var updateData = System.Text.Json.JsonSerializer.Deserialize<UpdatedData>(message.Value);
-
-            if (updateData is null || updateData.Document is null) return;
-
-            // var doc = LiteDB.JsonSerializer.Deserialize(updateData.Document.ToString()).AsDocument;
-            var jsonDoc = System.Text.Json.JsonSerializer.Deserialize<JsonElement>(updateData.Document);
-
-            var doc = EjsonConverter.NormalizeEjson(jsonDoc);
-
-            if (doc is null) return;
-
-            var collectionName = $"{updateData.Database}_{updateData.CollectionName}";
-            collectionName = collectionName.Replace("-", "_");
-
-            var collection = LiteDb.GetCollection(collectionName);
-
-            BsonValue? docId;
-            BsonValue? isDeleted = null;
-
-            if (!doc.TryGetValue("_id", out docId))
+        private void HandleAPISyncMessageReceived(object recipient, APISyncMessageReceived message)
+        {
+            _liteDbQueueProcessor.Enqueue(async db =>
             {
-                return;
-            }
+                var updateData = System.Text.Json.JsonSerializer.Deserialize<UpdatedData>(message.Value);
+                if (updateData is null || updateData.Document is null) return;
 
-            doc.TryGetValue("__meta", out var metaField);
-            metaField.AsDocument.TryGetValue("deleted", out isDeleted);
+                var jsonDoc = System.Text.Json.JsonSerializer.Deserialize<JsonElement>(updateData.Document);
+                var doc = EjsonConverter.NormalizeEjson(jsonDoc);
+                if (doc is null) return;
 
-            // If the document has been removed at the server level then clear out 
-            // of our local cache
-            if (isDeleted != null && isDeleted.AsBoolean)
-            {
-                collection.Delete(docId);
+                var collectionName = $"{updateData.Database}_{updateData.CollectionName}".Replace("-", "_");
+                var collection = db.GetCollection(collectionName);
+
+                if (!doc.TryGetValue("_id", out var docId)) return;
+
+
+                BsonValue? isDeleted = new BsonValue(false);
+
+                doc.TryGetValue("__meta", out var metaField);
+                metaField?.AsDocument.TryGetValue("deleted", out isDeleted);
+
+                if (isDeleted is not null && isDeleted.AsBoolean)
+                {
+                    collection.Delete(docId);
+                }
+                else
+                {
+                    collection.Upsert(doc);
+                }
+
                 _messenger.Send(new DatabaseChangeMessage(new()
                 {
                     ChangedItem = doc,
-                    IsDeleted = isDeleted,
+                    IsDeleted = isDeleted ?? new BsonValue(false),
                     CollectionName = collectionName,
                     Id = docId.AsObjectId
                 }));
-                return;
-            }
 
-            // Insert/update document
-            collection.Upsert(doc);
-
-            if(isDeleted is null)
-            {
-                isDeleted = new BsonValue(false);
-            }
-
-            _messenger.Send(new DatabaseChangeMessage(new()
-            {
-                ChangedItem = doc,
-                IsDeleted = isDeleted,
-                CollectionName = collectionName,
-                Id = docId.AsObjectId
-            }));
-
-            // Update the last id in the database           
-            SetLastId(updateData.Database, updateData.CollectionName, docId.AsObjectId);
+                SetLastId(updateData.Database, updateData.CollectionName, docId.AsObjectId);
+            });
         }
+
 
         private void HandleRealtimeUpdate(object recipient, RealtimeUpdateReceivedMessage message)
         {

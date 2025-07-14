@@ -7,12 +7,7 @@ using MongoDB.Sync.Interfaces;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using Services;
-using System.Net.Http.Json;
-using System.Net.Mime;
-using System.Security.Principal;
-using System.Text;
 using System.Text.Json;
-using System.Xml.Linq;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace MongoDB.Sync.Services
@@ -28,6 +23,12 @@ namespace MongoDB.Sync.Services
         private Func<HttpRequestMessage, Task>? _statusCheckAction;
         private Func<HttpRequestMessage, Task>? _preRequestAction;
         public readonly LocalDatabaseSyncService _localDatabaseService;
+
+        public bool SyncIsStarting { get; set; } = false;
+        public bool SyncHasCompleted { get; set; } = false;
+
+        private AppSyncMapping? _appDetails;
+        public bool AppSyncInProgress { get; set; } = false;
 
         private JsonSerializerOptions _serializationOptions = new()
         {
@@ -47,15 +48,12 @@ namespace MongoDB.Sync.Services
             _preRequestAction = preRequestAction;
         }
 
-        private bool _syncIsStarting = false;
-        private bool _syncHasStarted = false;
-        private AppSyncMapping? _appDetails;
-        public bool AppSyncInProgress { get; set; } = false;
+        
 
         public async Task StartSyncAsync()
         {
-            if (_syncHasStarted || _syncIsStarting) return;
-            _syncIsStarting = true;
+            if (SyncHasCompleted || SyncIsStarting) return;
+            SyncIsStarting = true;
 
             _appDetails = await GetAppInformation();
             if (_appDetails is null) throw new NullReferenceException(nameof(_appDetails));
@@ -66,13 +64,13 @@ namespace MongoDB.Sync.Services
             await PerformAPISync();
             await StartSignalRAsync();
 
-            _syncIsStarting = false;
-            _syncHasStarted = true;
+            SyncIsStarting = false;
+            SyncHasCompleted = true;
         }
 
         public async Task StopSyncAsync()
         {
-            if (!_syncHasStarted) return;
+            if (!SyncHasCompleted) return;
 
             if (_hubConnection != null && _hubConnection.State == HubConnectionState.Connected)
             {

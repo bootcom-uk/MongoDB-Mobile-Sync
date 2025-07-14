@@ -93,12 +93,6 @@ namespace MongoDB.Sync.Services
             return new LiveQueryableLiteCollection<T>(_messenger, _db, name, filter, order);
         }
 
-        public async Task<LiveQueryableLiteCollectionAsync<T>> GetLiveCollectionAsync<T>(string name, Func<T, bool>? filter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? order = null) where T : BaseLocalCacheModel
-        {
-            var collection = new LiveQueryableLiteCollectionAsync<T>(_messenger, _db, name, filter, order);
-            await collection.ReloadDataAsync();
-            return collection;
-        }
 
         private Queue<SyncLocalCacheDataChange> _changesToProcess = new();
 
