@@ -4,6 +4,10 @@ namespace MongoDB.Sync.Interfaces
     public interface ISyncService
     {
 
+        bool SyncIsStarting { get; set; }
+
+        bool SyncHasCompleted { get; set; }
+
         // Indicates if the synchronization process is currently in progress
         bool AppSyncInProgress { get; set; }
 
