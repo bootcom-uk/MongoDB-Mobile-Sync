@@ -1,5 +1,4 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 using MongoDB.Sync.Core.Services.Models.Services;
@@ -7,9 +6,6 @@ using MongoDB.Sync.Interfaces;
 using MongoDB.Sync.MAUI.Models;
 using MongoDB.Sync.Services;
 using Services;
-using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
 
 namespace MongoDB.Sync.MAUI.Extensions
 {

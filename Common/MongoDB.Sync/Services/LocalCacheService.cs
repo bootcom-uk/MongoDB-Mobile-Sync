@@ -10,6 +10,7 @@ using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
 using Services;
 using System.Data;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace MongoDB.Sync.Services
@@ -88,7 +89,7 @@ namespace MongoDB.Sync.Services
             return _db.GetCollection<T>(name);
         }
 
-        public LiveQueryableLiteCollection<T> GetLiveCollection<T>(string name, Func<T, bool>? filter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? order = null) where T : BaseLocalCacheModel
+        public LiveQueryableLiteCollection<T> GetLiveCollection<T>(string name, Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? order = null) where T : BaseLocalCacheModel
         {
             return new LiveQueryableLiteCollection<T>(_messenger, _db, name, filter, order);
         }

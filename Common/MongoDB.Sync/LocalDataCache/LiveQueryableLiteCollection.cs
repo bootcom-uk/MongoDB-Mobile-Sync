@@ -2,10 +2,13 @@
 using LiteDB;
 using MongoDB.Sync.Core.Services.Models.Models;
 using MongoDB.Sync.EventHandlers;
+using MongoDB.Sync.LiteDb;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models.Attributes;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Diagnostics;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Channels;
 
@@ -18,7 +21,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
     private readonly LiteDatabase _db;
     private readonly ILiteCollection<T> _collection;
     private readonly IMessenger _messenger;
-    private readonly Func<T, bool>? _filter;
+    private readonly Expression<Func<T, bool>>? _filter;
     private readonly Func<IQueryable<T>, IOrderedQueryable<T>>? _order;
 
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
@@ -32,7 +35,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
         IMessenger messenger,
         LiteDatabase db,
         string collectionName,
-        Func<T, bool>? filter = null,
+        Expression<Func<T, bool>>? filter = null,
         Func<IQueryable<T>, IOrderedQueryable<T>>? order = null)
     {
         _db = db;
@@ -61,16 +64,27 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
     {
         await _refreshLock.WaitAsync();
 
+        var sw = Stopwatch.StartNew();
+
         try
         {
-            var query = _collection.FindAll();
 
-            if (_filter != null)
-                query = query.Where(_filter);
+            IEnumerable<T> items = Enumerable.Empty<T>();   
 
-            var items = _order != null
-                ? _order(query.AsQueryable())
-                : query;
+            if(_filter == null)
+            {
+                items = _collection.FindAll();
+            }
+            else
+            {
+                items = _collection.Query().Where(_filter).ToList();      
+            }
+
+            if(_order != null)
+            {
+                items = _order(items.AsQueryable()).ToList();
+            }
+
 
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
@@ -82,17 +96,22 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
 
             foreach (var item in items)
             {
-                await MainThread.InvokeOnMainThreadAsync(async () =>
+                await MainThread.InvokeOnMainThreadAsync(() =>
                 {
                     Add(item);
-                    await Task.Delay(1);
                 });
             }
 
             await MainThread.InvokeOnMainThreadAsync(RaiseReset);
         }
+        catch(Exception ex)
+        {
+            Console.Write(ex.ToString());
+        }
         finally
         {
+            Debug.WriteLine($"Reloaded {_collection.Name} in {sw.ElapsedMilliseconds} ms");
+            sw.Stop();
             _refreshLock.Release();
         }
     }
@@ -152,14 +171,13 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
         var updated = _collection.FindById(new ObjectId(message.Value.Id));
         if (updated == null) return;
 
-        await MainThread.InvokeOnMainThreadAsync(async () =>
+        await MainThread.InvokeOnMainThreadAsync(() =>
         {
             var existing = this.FirstOrDefault(x => x.Id == updated.Id);
             if (existing == null)
             {
-                if (_filter != null && !_filter(updated)) return;
+                if (_filter != null && !_filter.Compile()(updated)) return;
                 Add(updated);
-                await Task.Delay(1);
                 ItemChanged?.Invoke(this, new(ItemChangedEventArgs<T>.CollectionChangeType.Added, updated));
             }
             else
@@ -170,7 +188,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
                     prop.SetValue(existing, newVal);
                 }
 
-                if (_filter != null && !_filter(existing))
+                if (_filter != null && !_filter.Compile()(existing))
                 {
                     Remove(existing);
                     ItemChanged?.Invoke(this, new(ItemChangedEventArgs<T>.CollectionChangeType.Removed, existing));

@@ -217,7 +217,6 @@ namespace MongoDB.Sync.Services
                 var doc = EjsonConverter.NormalizeEjson(updateData.Document);
 
                 // You can now use this with LiteDB:
-
                 if (doc is null) return;
 
                 var collection = LiteDb.GetCollection(collectionName);
