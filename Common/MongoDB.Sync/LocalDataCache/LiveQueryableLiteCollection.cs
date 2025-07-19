@@ -77,7 +77,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
             }
             else
             {
-                items = _collection.Query().Where(_filter).ToList();      
+                items = _collection.Query().Where(_filter).ToList();                     
             }
 
             if(_order != null)
