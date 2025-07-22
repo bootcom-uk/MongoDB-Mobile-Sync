@@ -16,7 +16,7 @@ namespace MongoDB.Sync.Services
 
         public readonly LiteDatabase LiteDb;
 
-        private string? _appName { get; set; }
+        public string? _appName { get; set; }
 
         private readonly BaseTypeResolverService _baseTypeResolverService;
 
@@ -69,6 +69,7 @@ namespace MongoDB.Sync.Services
             _appName = mapping.AppName;
 
             var appsCollection = LiteDb.GetCollection<AppSyncMapping>("AppMappings");
+
             var appRecord = appsCollection.FindOne(x => x.AppName == mapping.AppName);
 
             // Our mappings haven't ever been entered so we now need to add these to the 
@@ -111,6 +112,12 @@ namespace MongoDB.Sync.Services
                 // Where we haven't sync'd data in a while then we need to clear out the cache
                 ClearLocalCache(this, new ClearLocalCacheMessage(false));
             }
+
+             if(appRecord == null) return;
+
+            appsCollection = LiteDb.GetCollection<AppSyncMapping>("AppMappings");            
+            appRecord.ServerDateTime = mapping.ServerDateTime;
+            appsCollection.Upsert(mapping);
 
         }
 

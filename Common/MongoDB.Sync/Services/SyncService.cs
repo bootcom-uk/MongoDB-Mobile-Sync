@@ -6,7 +6,9 @@ using MongoDB.Sync.Converters;
 using MongoDB.Sync.Interfaces;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
+using MongoDB.Sync.Models.Web;
 using Services;
+using System.Net;
 using System.Text.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
@@ -55,12 +57,6 @@ namespace MongoDB.Sync.Services
             if (SyncHasCompleted || SyncIsStarting) return;
             SyncIsStarting = true;
 
-            _appDetails = await GetAppInformation();
-            if (_appDetails is null) throw new NullReferenceException(nameof(_appDetails));
-
-            _appDetails.AppName = _appName;
-            _messenger.Send(new InitializeLocalDataMappingMessage(_appDetails));
-
             await PerformAPISync();
             await StartSignalRAsync();
 
@@ -88,47 +84,90 @@ namespace MongoDB.Sync.Services
 
         private async Task PerformAPISync()
         {
-            _appDetails = _localDatabaseService.GetAppMapping();
-            if (_appDetails is null)
-                throw new NullReferenceException(nameof(_appDetails));
-
+            // Step 1: Get server-side app mapping
             var serverAppInfo = await GetAppInformation();
             if (serverAppInfo is null)
                 throw new Exception("Failed to get remote app mapping.");
 
-            var localCollectionKeys = _appDetails.Collections
-                .Select(c => $"{c.DatabaseName}.{c.CollectionName}")
-                .ToHashSet();
+            _messenger.Send(new InitializeLocalDataMappingMessage(serverAppInfo));
 
-            var serverCollectionKeys = serverAppInfo.Collections
-                .Select(c => $"{c.DatabaseName}.{c.CollectionName}")
-                .ToHashSet();
+            // Step 2: Get local app mapping
+            _appDetails = _localDatabaseService.GetAppMapping();
+            if (_appDetails is null)
+                throw new NullReferenceException(nameof(_appDetails));
 
-            var collectionsToRemove = localCollectionKeys.Except(serverCollectionKeys);
-            foreach (var key in collectionsToRemove)
+            // Step 3: Build local collection state with LastSyncDate
+            var localCollectionInfos = _appDetails.Collections.Select(c =>
             {
-                var parts = key.Split('.');
-                _localDatabaseService.ClearCollection($"{parts[0]}_{parts[1]}".Replace("-", "_"));
-            }
+                var latestUpdate = _localDatabaseService.GetLastSyncDateTime(c.DatabaseName, c.CollectionName);
 
+                return new WebSyncCollectionInfo
+                {
+                    DatabaseName = c.DatabaseName,
+                    CollectionName = c.CollectionName,
+                    CollectionVersion = c.Version,
+                    LastSyncDate = latestUpdate
+                };
+            }).ToList();
+
+            // Step 4: Build the request object
+            var updateRequest = new WebSyncCollectionCheckRequest
+            {
+                AppName = _appDetails.AppName,
+                Collections = localCollectionInfos
+            };
+
+            // Step 5: Call check-updates API using _httpService
+            var checkUpdatesUri = new Uri($"{_apiUrl}/api/DataSync/check-updates");
+            var builder = _httpService.CreateBuilder(checkUpdatesUri, HttpMethod.Post)
+                .WithJsonContent(updateRequest);
+
+            if (_preRequestAction != null) builder.PreRequest(_preRequestAction);
+            if (_statusCheckAction != null) builder.OnStatus(HttpStatusCode.Unauthorized, _statusCheckAction);
+
+            var updateStatuses = await builder
+                .WithRetry(3, TimeSpan.FromSeconds(2))
+                .SendAsync<WebSyncCollectionCheckResponse>(_serializationOptions);
+
+            if (updateStatuses == null)
+                throw new Exception("Failed to retrieve update statuses from server.");
+
+            if(!updateStatuses.Success)
+                throw new Exception(updateStatuses.Exception);
+
+            // Step 6: Process each collection in parallel
             int maxConcurrency = 5;
             using var throttler = new SemaphoreSlim(maxConcurrency);
 
-            var syncTasks = serverAppInfo.Collections.Select(async serverCollection =>
+            var syncTasks = updateStatuses.Result!.Updates.Select(async update =>
             {
                 await throttler.WaitAsync();
                 try
                 {
-                    var localCollection = _appDetails.Collections.FirstOrDefault(c =>
-                        c.DatabaseName == serverCollection.DatabaseName &&
-                        c.CollectionName == serverCollection.CollectionName);
+                    var collectionKey = $"{update.DatabaseName}_{update.CollectionName}".Replace("-", "_");
 
-                    if (localCollection == null || localCollection.Version != serverCollection.Version)
+                    if (update.ShouldRemoveLocally)
                     {
-                        _localDatabaseService.ClearCollection($"{serverCollection.DatabaseName}_{serverCollection.CollectionName}".Replace("-", "_"));
+                        _localDatabaseService.ClearCollection(collectionKey);
+                        return;
                     }
 
-                    await ProcessCollectionUpdate(serverCollection);
+                    if (update.ForceFullResync)
+                    {
+                        _localDatabaseService.ClearCollection(collectionKey);
+                    }
+
+                    if (update.RecordsToDownload > 0 || update.ForceFullResync)
+                    {
+                        var serverCollection = serverAppInfo.Collections.FirstOrDefault(c =>
+                            c.DatabaseName == update.DatabaseName &&
+                            c.CollectionName == update.CollectionName);
+
+                        if (serverCollection != null)
+                        {
+                            await ProcessCollectionUpdate(serverCollection);
+                        }
+                    }
                 }
                 finally
                 {
@@ -138,9 +177,72 @@ namespace MongoDB.Sync.Services
 
             await Task.WhenAll(syncTasks);
 
+            // Step 7: Mark initial sync as complete
             _localDatabaseService.InitialSyncComplete();
         }
 
+
+
+        //private async Task PerformAPISync()
+        //{
+
+        //    // Get details from server
+        //    var serverAppInfo = await GetAppInformation();
+        //    if (serverAppInfo is null)
+        //        throw new Exception("Failed to get remote app mapping.");
+
+        //    _messenger.Send(new InitializeLocalDataMappingMessage(serverAppInfo));
+
+        //    // Get details locally
+        //    _appDetails = _localDatabaseService.GetAppMapping();
+        //    if (_appDetails is null)
+        //        throw new NullReferenceException(nameof(_appDetails));
+
+
+        //    var localCollectionKeys = _appDetails.Collections
+        //        .Select(c => $"{c.DatabaseName}.{c.CollectionName}")
+        //        .ToHashSet();
+
+        //    var serverCollectionKeys = serverAppInfo.Collections
+        //        .Select(c => $"{c.DatabaseName}.{c.CollectionName}")
+        //        .ToHashSet();
+
+        //    var collectionsToRemove = localCollectionKeys.Except(serverCollectionKeys);
+        //    foreach (var key in collectionsToRemove)
+        //    {
+        //        var parts = key.Split('.');
+        //        _localDatabaseService.ClearCollection($"{parts[0]}_{parts[1]}".Replace("-", "_"));
+        //    }
+
+        //    int maxConcurrency = 5;
+        //    using var throttler = new SemaphoreSlim(maxConcurrency);
+
+        //    var syncTasks = serverAppInfo.Collections.Select(async serverCollection =>
+        //    {
+        //        await throttler.WaitAsync();
+        //        try
+        //        {
+        //            var localCollection = _appDetails.Collections.FirstOrDefault(c =>
+        //                c.DatabaseName == serverCollection.DatabaseName &&
+        //                c.CollectionName == serverCollection.CollectionName);
+
+        //            if (localCollection == null || localCollection.Version != serverCollection.Version)
+        //            {
+        //                _localDatabaseService.ClearCollection($"{serverCollection.DatabaseName}_{serverCollection.CollectionName}".Replace("-", "_"));
+        //            }
+
+        //            await ProcessCollectionUpdate(serverCollection);
+        //        }
+        //        finally
+        //        {
+        //            throttler.Release();
+        //        }
+        //    });
+
+        //    await Task.WhenAll(syncTasks);
+
+        //    _localDatabaseService.InitialSyncComplete();
+        //}
 
 
         public async Task ProcessCollectionUpdate(CollectionMapping item)
@@ -174,7 +276,7 @@ namespace MongoDB.Sync.Services
                 if (_preRequestAction != null) builder.PreRequest(_preRequestAction);
                 if (_statusCheckAction != null) builder.OnStatus(System.Net.HttpStatusCode.Unauthorized, _statusCheckAction);
 
-                var response = await builder.WithRetry(3).SendAsync<SyncResult>(_serializationOptions);
+                var response = await builder.WithRetry(3, TimeSpan.FromSeconds(2)).SendAsync<SyncResult>(_serializationOptions);
 
                 if (response == null || !response.Success) break;
                 dataSyncResult = response.Result;
@@ -301,7 +403,7 @@ namespace MongoDB.Sync.Services
 
             var response = await builder
                 .WithFormContent(new Dictionary<string, string> { { "AppName", _appName } })
-                .WithRetry(3)
+                .WithRetry(3, TimeSpan.FromSeconds(2))
                 .SendAsync<AppSyncMapping>(_serializationOptions);
 
             if (response is null) throw new NullReferenceException("The request failed and returned no response");

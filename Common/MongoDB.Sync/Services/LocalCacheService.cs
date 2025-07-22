@@ -3,6 +3,7 @@ using LiteDB;
 using Microsoft.Extensions.Logging;
 using MongoDB.Sync.Core.Services.Models.Models;
 using MongoDB.Sync.Core.Services.Models.Services;
+using MongoDB.Sync.Interfaces;
 using MongoDB.Sync.LiteDb;
 using MongoDB.Sync.LocalDataCache;
 using MongoDB.Sync.Messages;
@@ -27,6 +28,7 @@ namespace MongoDB.Sync.Services
         private readonly Func<HttpRequestMessage, Task>? _statusChangeAction;
         private readonly IMessenger _messenger;
         private readonly BaseTypeResolverService _baseTypeResolverService;
+        private readonly ISyncService _syncService;
 
         public LocalCacheService(IMessenger messenger, LocalDatabaseSyncService localDatabaseSyncService, ILogger<LocalCacheService> logger, HttpService httpService, string apiUrl, string appName, Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction, BaseTypeResolverService baseTypeResolverService)
         {
@@ -114,6 +116,13 @@ namespace MongoDB.Sync.Services
 
             while (true)
             {
+
+                //// If the sync hasn't completed then wait for it to finish
+                //if (!_syncService.SyncHasCompleted) {
+                //    await Task.Delay(TimeSpan.FromMilliseconds(500));
+                //    continue;
+                //}
+
                 // No changes to process so wait for a bit
                 if (_changesToProcess.Count == 0)
                 {
@@ -142,7 +151,7 @@ namespace MongoDB.Sync.Services
                 }
 
                 builder.WithJsonContent<LocalCacheDataChange>(localCacheDataChange);
-                builder.WithRetry(3);
+                builder.WithRetry(3, TimeSpan.FromSeconds(2));
 
                 var response = await builder.SendAsync();
 

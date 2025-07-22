@@ -208,9 +208,9 @@ namespace MongoDB.Sync.Web.Services
             return true; // Assume they have permission for now
         }
 
-        private IMongoCollection<BsonDocument> GetCollection(string appName, string databaseName, string collectionName)
+        private IMongoCollection<BsonDocument> GetCollection(string appId, string databaseName, string collectionName)
         {
-            var fullCollectionName = $"{appName}_{collectionName}";
+            var fullCollectionName = $"{appId}_{collectionName}";
             var db = _appServicesDb.Client.GetDatabase("AppServices");
             return db.GetCollection<BsonDocument>(fullCollectionName);
         }
@@ -227,6 +227,8 @@ namespace MongoDB.Sync.Web.Services
             var allMappings = await GetAppSyncMappings();
             var serverMappings = allMappings.FirstOrDefault(record => record.AppName == appName);
             
+            var appId = serverMappings!.AppId;
+
             var result = new ConcurrentBag<WebSyncCollectionUpdateStatus>();
 
             var localMap = localState.ToDictionary(
@@ -255,7 +257,7 @@ namespace MongoDB.Sync.Web.Services
                         // Count only if version is fine
                         if (!forceResync)
                         {
-                            var collection = GetCollection(appName, serverCollection.DatabaseName, serverCollection.CollectionName);
+                            var collection = GetCollection(appId, serverCollection.DatabaseName, serverCollection.CollectionName);
                             var filter = Builders<BsonDocument>.Filter.Gt("__meta.dateUpdated", localInfo.LastSyncDate);
                             recordsToDownload = (int)await collection.CountDocumentsAsync(filter);
                         }
@@ -263,7 +265,7 @@ namespace MongoDB.Sync.Web.Services
                     else
                     {
                         // New collection not present on device — full count
-                        var collection = GetCollection(appName, serverCollection.DatabaseName, serverCollection.CollectionName);
+                        var collection = GetCollection(appId, serverCollection.DatabaseName, serverCollection.CollectionName);
                         var count = (int)await collection.CountDocumentsAsync(new BsonDocument());
                         recordsToDownload = count;
                         forceResync = true; // new to device
@@ -296,8 +298,8 @@ namespace MongoDB.Sync.Web.Services
                     DatabaseName = local.DatabaseName,
                     CollectionName = local.CollectionName,
                     RecordsToDownload = 0,
-                    //ShouldRemoveLocally = true,
-                    //ForceFullResync = false
+                    ShouldRemoveLocally = true,
+                    ForceFullResync = false
                 });
 
             await Task.WhenAll(tasks);
