@@ -50,7 +50,9 @@ namespace MongoDB.Sync.MAUI.Extensions
                 var options = provider.GetRequiredService<SyncOptions>();
                 var messenger = provider.GetRequiredService<IMessenger>();
                 var networkStateService = provider.GetRequiredService<NetworkStateService>();
-                return new SyncService(provider.GetRequiredService<LocalDatabaseSyncService>(), provider.GetRequiredService<HttpService>(), messenger, networkStateService, options.ApiUrl, options.AppName, options.PreRequestAction, options.StatusChangeAction);
+                var localCacheService = provider.GetRequiredService<LocalCacheService>();
+
+                return new SyncService(provider.GetRequiredService<LocalDatabaseSyncService>(), provider.GetRequiredService<HttpService>(), messenger, networkStateService, options.ApiUrl, options.AppName, options.PreRequestAction, options.StatusChangeAction, localCacheService);
             });
 
             builder.Services.AddSingleton<LocalCacheService>(provider =>
@@ -61,7 +63,6 @@ namespace MongoDB.Sync.MAUI.Extensions
                 var httpService = provider.GetRequiredService<HttpService>();
                 var messenger = provider.GetRequiredService<IMessenger>();
                 var baseTypeResolverService = provider.GetRequiredService<BaseTypeResolverService>();
-                var syncService = provider.GetRequiredService<ISyncService>();
 
                return new LocalCacheService(messenger, localDatabaseSyncService, logger, httpService, options.ApiUrl, options.AppName, options.PreRequestAction, options.StatusChangeAction, baseTypeResolverService);
             });
