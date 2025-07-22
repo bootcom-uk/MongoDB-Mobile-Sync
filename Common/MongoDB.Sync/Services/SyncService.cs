@@ -25,6 +25,7 @@ namespace MongoDB.Sync.Services
         private Func<HttpRequestMessage, Task>? _statusCheckAction;
         private Func<HttpRequestMessage, Task>? _preRequestAction;
         public readonly LocalDatabaseSyncService _localDatabaseService;
+        private readonly LocalCacheService _localCacheService;
 
         public bool SyncIsStarting { get; set; } = false;
         public bool SyncHasCompleted { get; set; } = false;
@@ -38,7 +39,7 @@ namespace MongoDB.Sync.Services
             Converters = { new ObjectIdConverter() }
         };
 
-        public SyncService(LocalDatabaseSyncService localDatabaseService, HttpService httpService, IMessenger messenger, NetworkStateService networkStateService, string apiUrl, string appName, Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction)
+        public SyncService(LocalDatabaseSyncService localDatabaseService, HttpService httpService, IMessenger messenger, NetworkStateService networkStateService, string apiUrl, string appName, Func<HttpRequestMessage, Task>? preRequestAction, Func<HttpRequestMessage, Task>? statusChangeAction, LocalCacheService localCacheService)
         {
             _apiUrl = apiUrl;
             _appName = appName;
@@ -48,11 +49,12 @@ namespace MongoDB.Sync.Services
             _networkStateService = networkStateService;
             _statusCheckAction = statusChangeAction;
             _preRequestAction = preRequestAction;
+            _localCacheService = localCacheService;
         }
 
-        
 
-        public async Task StartSyncAsync()
+
+         public async Task StartSyncAsync()
         {
             if (SyncHasCompleted || SyncIsStarting) return;
             SyncIsStarting = true;
@@ -62,6 +64,8 @@ namespace MongoDB.Sync.Services
 
             SyncIsStarting = false;
             SyncHasCompleted = true;
+
+            _localCacheService.SyncHasCompleted = true;
         }
 
         public async Task StopSyncAsync()

@@ -61,8 +61,9 @@ namespace MongoDB.Sync.MAUI.Extensions
                 var httpService = provider.GetRequiredService<HttpService>();
                 var messenger = provider.GetRequiredService<IMessenger>();
                 var baseTypeResolverService = provider.GetRequiredService<BaseTypeResolverService>();
+                var syncService = provider.GetRequiredService<ISyncService>();
 
-                return new LocalCacheService(messenger, localDatabaseSyncService, logger, httpService, options.ApiUrl, options.AppName, options.PreRequestAction, options.StatusChangeAction, baseTypeResolverService);
+               return new LocalCacheService(messenger, localDatabaseSyncService, logger, httpService, options.ApiUrl, options.AppName, options.PreRequestAction, options.StatusChangeAction, baseTypeResolverService);
             });
 
             return builder;
