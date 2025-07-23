@@ -62,6 +62,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
         _ = RefreshAsync();
     }
 
+
     public Task RefreshAsync() => ReloadDataAsync();
 
     private async Task ReloadDataAsync()
