@@ -92,9 +92,9 @@ namespace MongoDB.Sync.Services
             return _db.GetCollection<T>(name);
         }
 
-        public LiveQueryableLiteCollection<T> GetLiveCollection<T>(string name, Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? order = null) where T : BaseLocalCacheModel
+        public LiveQueryableLiteCollection<T> GetLiveCollection<T>(string name, Expression<Func<T, bool>>? filter = null, Expression<Func<T, bool>>? secondaryFilter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? order = null) where T : BaseLocalCacheModel
         {
-            return new LiveQueryableLiteCollection<T>(_messenger, _db, name, filter, order);
+            return new LiveQueryableLiteCollection<T>(_messenger, _db, name, filter, secondaryFilter, order);
         }
 
 

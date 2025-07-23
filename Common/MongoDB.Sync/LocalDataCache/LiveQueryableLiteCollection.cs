@@ -8,6 +8,7 @@ using MongoDB.Sync.Models.Attributes;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Channels;
@@ -22,6 +23,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
     private readonly ILiteCollection<T> _collection;
     private readonly IMessenger _messenger;
     private readonly Expression<Func<T, bool>>? _filter;
+    private readonly Expression<Func<T, bool>>? _secondaryFilter;
     private readonly Func<IQueryable<T>, IOrderedQueryable<T>>? _order;
 
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
@@ -36,11 +38,13 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
         LiteDatabase db,
         string collectionName,
         Expression<Func<T, bool>>? filter = null,
+        Expression<Func<T, bool>>? secondaryFilter = null,
         Func<IQueryable<T>, IOrderedQueryable<T>>? order = null)
     {
         _db = db;
         _collection = _db.GetCollection<T>(collectionName);
         _filter = filter;
+        _secondaryFilter = secondaryFilter;
         _order = order;
         _messenger = messenger;
 
@@ -77,10 +81,15 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
             }
             else
             {
-                items = _collection.Query().Where(_filter).ToList();                     
+                items = _collection.Query().Where(_filter).ToList();  
             }
 
-            if(_order != null)
+            if (_secondaryFilter != null)
+            {
+                items = items.Where(_secondaryFilter.Compile()).ToList();
+            }
+
+            if (_order != null)
             {
                 items = _order(items.AsQueryable()).ToList();
             }
@@ -176,7 +185,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
             var existing = this.FirstOrDefault(x => x.Id == updated.Id);
             if (existing == null)
             {
-                if (_filter != null && !_filter.Compile()(updated)) return;
+                if ((_filter != null && !_filter.Compile()(updated)) && (_secondaryFilter != null && !_secondaryFilter.Compile()(updated))) return;
                 Add(updated);
                 ItemChanged?.Invoke(this, new(ItemChangedEventArgs<T>.CollectionChangeType.Added, updated));
             }
