@@ -28,7 +28,6 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
 
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private readonly Dictionary<Type, string> _usedCollections = new();
-    private readonly Channel<DatabaseChangeMessage> _changeQueue = Channel.CreateUnbounded<DatabaseChangeMessage>();
 
     private bool _suspendNotifications;
     private static readonly PropertyInfo[] _props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
