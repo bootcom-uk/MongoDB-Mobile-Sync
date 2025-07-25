@@ -28,6 +28,11 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
 
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private readonly Dictionary<Type, string> _usedCollections = new();
+    private readonly Channel<DatabaseChangeMessage> _changeQueue = Channel.CreateUnbounded<DatabaseChangeMessage>(new UnboundedChannelOptions
+    {
+        SingleReader = true,
+        SingleWriter = true
+    });
 
     private bool _suspendNotifications;
     private static readonly PropertyInfo[] _props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
@@ -57,8 +62,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
         }
 
         _messenger.Register<DatabaseChangeMessage>(this, (_, message) => _changeQueue.Writer.TryWrite(message));
-        _ = Task.Run(ProcessQueueAsync);
-        _ = RefreshAsync();
+        _ = Task.Run(ProcessQueueAsync); _ = RefreshAsync();
     }
 
 
@@ -81,7 +85,8 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
             }
             else
             {
-                items = _collection.Query().Where(_filter).ToList();  
+                items = _collection.Find(_filter).ToList();
+                // items = _collection.Query().Where(_filter).ToList();  
             }
 
             if (_secondaryFilter != null)
@@ -115,7 +120,7 @@ public class LiveQueryableLiteCollection<T> : ObservableCollection<T> where T : 
         }
         catch(Exception ex)
         {
-            Console.Write(ex.ToString());
+               Debug.WriteLine($"Reloading {_collection.Name} throws exception {ex.ToString()}");
         }
         finally
         {

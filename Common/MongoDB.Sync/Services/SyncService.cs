@@ -110,7 +110,7 @@ namespace MongoDB.Sync.Services
                     DatabaseName = c.DatabaseName,
                     CollectionName = c.CollectionName,
                     CollectionVersion = c.Version,
-                    LastSyncDate = latestUpdate
+                    LastSyncDate = latestUpdate ?? DateTime.MinValue
                 };
             }).ToList();
 

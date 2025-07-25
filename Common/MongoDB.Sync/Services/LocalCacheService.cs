@@ -161,7 +161,7 @@ namespace MongoDB.Sync.Services
                 {
                     
                     // Clear out from the local cache
-                    collection.DeleteMany(record => record.InternalId == localCacheDataChange.InternalId && record.Id == localCacheDataChange.Id);
+                    var recordsRemoved = collection.DeleteMany(record => record.InternalId == localCacheDataChange.InternalId && record.Id == localCacheDataChange.Id);
 
                     // Successfully processed the change so remove it from the queue
                     _changesToProcess.Dequeue();
@@ -213,7 +213,8 @@ namespace MongoDB.Sync.Services
                 CollectionName = attribute.CollectionName,
                 IsDeletion = false,
                 Id = idValue.ToString(),
-                Document = bson
+                Document = bson,
+                InternalId = ObjectId.NewObjectId()
             });
 
         }

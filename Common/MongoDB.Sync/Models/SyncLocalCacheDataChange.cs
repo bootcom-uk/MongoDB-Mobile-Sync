@@ -11,7 +11,7 @@ namespace MongoDB.Sync.Models
         public BsonDocument? Document { get; set; }
 
         // Internal identifier
-        public ObjectId InternalId { get; }  = ObjectId.NewObjectId();
+        public ObjectId InternalId { get; set; }
 
     }
 }
