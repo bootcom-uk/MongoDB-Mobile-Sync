@@ -75,7 +75,7 @@ namespace MongoDB.Sync.Web.Services
             return true;
         }
 
-        private async Task SyncCollection(AppSyncMapping appMapping, CollectionMapping collectionMapping)
+        public async Task SyncCollection(AppSyncMapping appMapping, CollectionMapping collectionMapping)
         {
             var collectionName = collectionMapping.CollectionName;
             var dbName = collectionMapping.DatabaseName;
@@ -99,7 +99,6 @@ namespace MongoDB.Sync.Web.Services
             _logger.LogInformation($"Created collection {targetCollectionName} in AppServices database.");
 
             var targetCollection = targetDb.GetCollection<BsonDocument>(targetCollectionName);
-
 
             // Create index on __meta.dateUpdated
             var indexKeys = Builders<BsonDocument>.IndexKeys.Ascending("__meta.dateUpdated");
