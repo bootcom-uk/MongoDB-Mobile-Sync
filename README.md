@@ -105,6 +105,34 @@ This trigger listens to changes in MongoDB collections and forwards inserts, upd
             }, endpoint, bearerToken);
         }
 
+        // Handle document replace (full document replacement)
+        if (changeEvent.operationType === "replace") {
+            let replacedDocument = {};
+            matchingCollection.fields.forEach(field => {
+                if (fullDocument[field] !== undefined) {
+                    replacedDocument[field] = fullDocument[field];
+                }
+            });
+        
+            replacedDocument["_id"] = fullDocument._id;
+            replacedDocument["__meta"] = { "dateUpdated": new Date() };
+        
+            await context.services.get(currentClusterName).db("AppServices").collection(collectionToUpdate).updateOne(
+                { _id: fullDocument._id },
+                { $set: replacedDocument },
+                { upsert: true }
+            );
+        
+            // Send replaced data to the app's endpoint
+            await sendToWebAPI({
+                action: "replace",
+                collection: collectionName,
+                document: replacedDocument,
+                appId: appName,
+                database: databaseName
+            }, endpoint, bearerToken);
+        }
+
         // Handle document update
         if (changeEvent.operationType === "update") {
           let filteredDocument = {};
