@@ -10,9 +10,11 @@ using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
 using Services;
+using System.Collections;
 using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Reflection.Metadata;
 
 namespace MongoDB.Sync.Services
 {
@@ -207,6 +209,13 @@ namespace MongoDB.Sync.Services
 
             var bson = BsonMapper.Global.Serialize(typeof(T), item).AsDocument;
             collection.Upsert(bson);
+
+            _messenger.Send(new DatabaseChangeMessage(new()
+            {
+                ChangedItem = bson,
+                CollectionName = attribute.CollectionName,
+                Id = idValue
+            }));
 
             Enqueue(new SyncLocalCacheDataChange
             {
