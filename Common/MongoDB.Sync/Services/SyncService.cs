@@ -50,6 +50,15 @@ namespace MongoDB.Sync.Services
             _statusCheckAction = statusChangeAction;
             _preRequestAction = preRequestAction;
             _localCacheService = localCacheService;
+
+            _messenger.Register<NetworkStateChangedMessage>(this, async (r, m) =>
+            {
+                // If we're not connected, don't do anything
+                if (m.Value != NetworkStateService.NetworkState.Connected) return;
+
+                // When we are connected, resubscribe to SignalR and perform a sync
+                await ResubscribeToSignalR();
+            });
         }
 
 
@@ -57,6 +66,17 @@ namespace MongoDB.Sync.Services
          public async Task StartSyncAsync()
         {
             if (SyncHasCompleted || SyncIsStarting) return;
+            
+            if(_networkStateService.CurrentState != NetworkStateService.NetworkState.Connected)
+            {
+                SyncIsStarting = true;
+                Console.WriteLine("⚠️ Cannot start sync: No network connection.");
+                SyncIsStarting = false;
+                SyncHasCompleted = true;
+                _localCacheService.SyncHasCompleted = true;
+                return;
+            }
+
             SyncIsStarting = true;
 
             await PerformAPISync();
@@ -184,70 +204,6 @@ namespace MongoDB.Sync.Services
             // Step 7: Mark initial sync as complete
             _localDatabaseService.InitialSyncComplete();
         }
-
-
-
-        //private async Task PerformAPISync()
-        //{
-
-        //    // Get details from server
-        //    var serverAppInfo = await GetAppInformation();
-        //    if (serverAppInfo is null)
-        //        throw new Exception("Failed to get remote app mapping.");
-
-        //    _messenger.Send(new InitializeLocalDataMappingMessage(serverAppInfo));
-
-        //    // Get details locally
-        //    _appDetails = _localDatabaseService.GetAppMapping();
-        //    if (_appDetails is null)
-        //        throw new NullReferenceException(nameof(_appDetails));
-
-
-        //    var localCollectionKeys = _appDetails.Collections
-        //        .Select(c => $"{c.DatabaseName}.{c.CollectionName}")
-        //        .ToHashSet();
-
-        //    var serverCollectionKeys = serverAppInfo.Collections
-        //        .Select(c => $"{c.DatabaseName}.{c.CollectionName}")
-        //        .ToHashSet();
-
-        //    var collectionsToRemove = localCollectionKeys.Except(serverCollectionKeys);
-        //    foreach (var key in collectionsToRemove)
-        //    {
-        //        var parts = key.Split('.');
-        //        _localDatabaseService.ClearCollection($"{parts[0]}_{parts[1]}".Replace("-", "_"));
-        //    }
-
-        //    int maxConcurrency = 5;
-        //    using var throttler = new SemaphoreSlim(maxConcurrency);
-
-        //    var syncTasks = serverAppInfo.Collections.Select(async serverCollection =>
-        //    {
-        //        await throttler.WaitAsync();
-        //        try
-        //        {
-        //            var localCollection = _appDetails.Collections.FirstOrDefault(c =>
-        //                c.DatabaseName == serverCollection.DatabaseName &&
-        //                c.CollectionName == serverCollection.CollectionName);
-
-        //            if (localCollection == null || localCollection.Version != serverCollection.Version)
-        //            {
-        //                _localDatabaseService.ClearCollection($"{serverCollection.DatabaseName}_{serverCollection.CollectionName}".Replace("-", "_"));
-        //            }
-
-        //            await ProcessCollectionUpdate(serverCollection);
-        //        }
-        //        finally
-        //        {
-        //            throttler.Release();
-        //        }
-        //    });
-
-        //    await Task.WhenAll(syncTasks);
-
-        //    _localDatabaseService.InitialSyncComplete();
-        //}
-
 
         public async Task ProcessCollectionUpdate(CollectionMapping item)
         {
@@ -411,6 +367,11 @@ namespace MongoDB.Sync.Services
                 .SendAsync<AppSyncMapping>(_serializationOptions);
 
             if (response is null) throw new NullReferenceException("The request failed and returned no response");
+            if (!response.Success && !response.HasInternetConnection) {
+                _networkStateService.ChangeNetworkState(NetworkStateService.NetworkState.Disconnected);
+                return null;
+            }
+
             if (!response.Success) throw new Exception(response.Exception);
 
             var appSyncMapping = response.Result;
