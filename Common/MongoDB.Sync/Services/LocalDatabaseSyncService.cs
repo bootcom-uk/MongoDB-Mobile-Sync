@@ -5,6 +5,8 @@ using MongoDB.Sync.Core.Services.Models.Services;
 using MongoDB.Sync.LiteDb;
 using MongoDB.Sync.Messages;
 using MongoDB.Sync.Models;
+using System;
+using System.Collections.ObjectModel;
 using System.Text.Json;
 
 namespace MongoDB.Sync.Services
@@ -122,17 +124,28 @@ namespace MongoDB.Sync.Services
         }
 
         public DateTime? GetLastSyncDateTime(string databaseName, string collectionName)
-        {            
-            var collection = LiteDb.GetCollection($"{databaseName}_{collectionName}".Replace("-", "_"));
-            var lastDoc = collection
-            .Find(Query.All("__meta.dateUpdated", Query.Descending))
-            .FirstOrDefault();
-
-            if (lastDoc != null && lastDoc["__meta"]["dateUpdated"].IsDateTime)
+        {
+            try
             {
-                return lastDoc["__meta"]["dateUpdated"].AsDateTime;                
-            }
+                var collection = LiteDb.GetCollection($"{databaseName}_{collectionName}".Replace("-", "_"));
+                var lastDoc = collection
+                .Find(Query.All("__meta.dateUpdated", Query.Descending))
+                .FirstOrDefault();
 
+                if (lastDoc != null && lastDoc["__meta"]["dateUpdated"].IsDateTime)
+                {
+                    return lastDoc["__meta"]["dateUpdated"].AsDateTime;
+                }
+            }
+            catch(Exception ex)
+            {
+                var collection = LiteDb.GetCollection($"{databaseName}_{collectionName}".Replace("-", "_"));
+                var lastDoc = collection
+                .Find(Query.All("__meta.dateUpdated", Query.Descending))
+                .FirstOrDefault();
+                Console.WriteLine(collectionName);
+            }
+            
             return null;
         }
 

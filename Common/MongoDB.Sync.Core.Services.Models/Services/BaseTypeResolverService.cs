@@ -18,11 +18,21 @@ namespace MongoDB.Sync.Core.Services.Models.Services
                 .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location)));
 
             var allTypes = assemblies
-                .SelectMany(a => a.GetTypes())
-                .Where(t =>
-                    t.IsClass &&
-                    typeof(BaseLocalCacheModel).IsAssignableFrom(t) &&
-                    t.GetCustomAttribute<CollectionNameAttribute>() != null);
+             .SelectMany(a =>
+             {
+                 try
+                 {
+                     return a.GetTypes();
+                 }
+                 catch (ReflectionTypeLoadException ex)
+                 {
+                     return ex.Types.Where(t => t != null); // filter out the bad ones
+                 }
+             })
+             .Where(t =>
+                 t.IsClass &&
+                 typeof(BaseLocalCacheModel).IsAssignableFrom(t) &&
+                 t.GetCustomAttribute<CollectionNameAttribute>() != null);
 
             foreach (var refType in allTypes)
             {
