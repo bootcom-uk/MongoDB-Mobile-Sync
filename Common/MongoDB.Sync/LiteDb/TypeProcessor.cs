@@ -76,6 +76,7 @@ namespace MongoDB.Sync.LiteDb
                     foreach (var prpInfo in listItemType.GetProperties())
                     {
 
+                        
                         if (itemValue[prpInfo.Name].IsObjectId && prpInfo.PropertyType != typeof(ObjectId))
                         {
                             var collectionName = prpInfo.PropertyType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
@@ -91,12 +92,14 @@ namespace MongoDB.Sync.LiteDb
                             continue;
                         }
 
-                        var deserializedValue = BsonMapper.Global.Deserialize(prpInfo.PropertyType, itemValue[prpInfo.Name]);
+                        var tmpItemValue = itemValue[prpInfo.Name == "Id" ? "_id" : prpInfo.Name];
+
+                        var deserializedValue = BsonMapper.Global.Deserialize(prpInfo.PropertyType, tmpItemValue);
 
                         // 🔥 If it's an object (not primitive) and has properties, recurse
-                        if (deserializedValue != null && !IsPrimitiveOrString(prpInfo.PropertyType))
+                        if (deserializedValue != null && tmpItemValue.IsDocument && !IsPrimitiveOrString(prpInfo.PropertyType))
                         {
-                            deserializedValue = ProcessTypeForDeserialization(deserializedValue, itemValue[prpInfo.Name].AsDocument, db);
+                            deserializedValue = ProcessTypeForDeserialization(deserializedValue, tmpItemValue.AsDocument, db);
                         }
 
                         prpInfo.SetValue(listItemObject, deserializedValue);
