@@ -74,25 +74,61 @@ namespace MongoDB.Sync.LiteDb
             if (addMethod is null)
                 throw new InvalidOperationException($"Cannot find Add() method on {collectionType}");
 
-            foreach (var itemValue in value.AsArray)
+            // If this object type doesn't derive from BaseLocalCacheModel then
+            // we need to set the value directly
+            var listItemType = propertyInfo?.PropertyType?.GenericTypeArguments[0]!;
+
+            if (listItemType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName == null)
             {
-                var itemObject = Activator.CreateInstance(elementType);
-                foreach (var prpInfo in elementType.GetProperties())
+
+                foreach (var itemValue in value.AsArray)
                 {
-                    var tmpItemValue = itemValue[prpInfo.Name == "Id" ? "_id" : prpInfo.Name];
-                    var deserializedValue = BsonMapper.Global.Deserialize(prpInfo.PropertyType, tmpItemValue);
+                    var itemObject = Activator.CreateInstance(elementType);
+                    foreach (var prpInfo in elementType.GetProperties())
+                    {
 
-                    if (deserializedValue != null && tmpItemValue.IsDocument && !IsPrimitiveOrString(prpInfo.PropertyType))
-                        deserializedValue = ProcessTypeForDeserialization(deserializedValue, tmpItemValue.AsDocument, db);
+                        if (itemValue[prpInfo.Name].IsObjectId && prpInfo.PropertyType != typeof(ObjectId))
+                        {
+                            var collectionName = prpInfo.PropertyType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
+                            if (string.IsNullOrWhiteSpace(collectionName)) continue;
+                            var bsonObject = db.GetCollection(collectionName).FindById(itemValue[prpInfo.Name].AsObjectId);
+                            if (bsonObject is null) continue;
+                            var nestedObject = BsonMapper.Global.Deserialize(prpInfo.PropertyType, bsonObject);
 
-                    prpInfo.SetValue(itemObject, deserializedValue);
+                            // 🔥 RECURSION TIME
+                            nestedObject = ProcessTypeForDeserialization(nestedObject, bsonObject, db);
+
+                            prpInfo.SetValue(itemObject, nestedObject);
+                            continue;
+                        }
+
+                        var tmpItemValue = itemValue[prpInfo.Name == "Id" ? "_id" : prpInfo.Name];
+                        var deserializedValue = BsonMapper.Global.Deserialize(prpInfo.PropertyType, tmpItemValue);
+
+                        if (deserializedValue != null && tmpItemValue.IsDocument && !IsPrimitiveOrString(prpInfo.PropertyType))
+                            deserializedValue = ProcessTypeForDeserialization(deserializedValue, tmpItemValue.AsDocument, db);
+
+                        prpInfo.SetValue(itemObject, deserializedValue);
+                    }
+
+                    addMethod.Invoke(underlyingCollection, new[] { itemObject });
                 }
 
-                addMethod.Invoke(underlyingCollection, new[] { itemObject });
+                return (true, underlyingCollection);
             }
 
+            // This object derives from BaseLocalCacheModel so we need to set the value
+            foreach (var itemValue in value.AsArray)
+            {
+                var collectionName = propertyInfo!.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
+                var displayObject = db.GetCollection(collectionName).FindById(itemValue.ToString());
+                addMethod.Invoke(underlyingCollection, new[] { displayObject });
+            }
             return (true, underlyingCollection);
+
         }
+
+
 
 
         //internal static (bool, Object?) ProcessCollectionTypeForDeserialization(string key, BsonValue value, Type itemType, LiteDB.LiteDatabase db)
@@ -122,7 +158,7 @@ namespace MongoDB.Sync.LiteDb
         //            foreach (var prpInfo in listItemType.GetProperties())
         //            {
 
-                        
+
         //                if (itemValue[prpInfo.Name].IsObjectId && prpInfo.PropertyType != typeof(ObjectId))
         //                {
         //                    var collectionName = prpInfo.PropertyType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
