@@ -49,79 +49,125 @@ namespace MongoDB.Sync.LiteDb
             return item;
         }
 
-        internal static (bool, Object?) ProcessCollectionTypeForDeserialization(string key, BsonValue value, Type itemType, LiteDB.LiteDatabase db)
+        internal static (bool, object?) ProcessCollectionTypeForDeserialization(string key, BsonValue value, Type itemType, LiteDatabase db)
         {
             if (!value.IsArray) return (false, null);
 
             var propertyInfo = itemType.GetProperty(key);
+            if (propertyInfo?.PropertyType is null ||
+                propertyInfo.PropertyType.GenericTypeArguments.Length == 0)
+                return (false, null);
 
-            if (propertyInfo?.PropertyType is null || propertyInfo?.PropertyType?.GenericTypeArguments is null || propertyInfo?.PropertyType?.GenericTypeArguments.Count() == 0) return (false, null);
+            var elementType = propertyInfo.PropertyType.GenericTypeArguments[0];
+            var collectionType = propertyInfo.PropertyType;
 
-            var listType = typeof(List<>).MakeGenericType(propertyInfo?.PropertyType?.GenericTypeArguments[0]!);
-            var underlyingList = (IList?)Activator.CreateInstance(listType);
+            // Try to create the declared collection type (ObservableCollection<T>, List<T>, etc.)
+            var underlyingCollection = Activator.CreateInstance(collectionType)
+                                     ?? Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType));
 
-            if (underlyingList is null) return (false, null);
+            // Fallback: if we can’t create the property’s type, at least get a List<T>
+            if (underlyingCollection is null) return (false, null);
 
-            // If this object type doesn't derive from BaseLocalCacheModel then
-            // we need to set the value directly
-            var listItemType = propertyInfo?.PropertyType?.GenericTypeArguments[0]!;
+            var addMethod = collectionType.GetMethod("Add")
+                            ?? underlyingCollection.GetType().GetMethod("Add");
 
-            if (listItemType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName == null)
-            {
+            if (addMethod is null)
+                throw new InvalidOperationException($"Cannot find Add() method on {collectionType}");
 
-                foreach (var itemValue in value.AsArray)
-                {
-                    var listItemObject = Activator.CreateInstance(listItemType);
-
-                    foreach (var prpInfo in listItemType.GetProperties())
-                    {
-
-                        
-                        if (itemValue[prpInfo.Name].IsObjectId && prpInfo.PropertyType != typeof(ObjectId))
-                        {
-                            var collectionName = prpInfo.PropertyType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
-                            if (string.IsNullOrWhiteSpace(collectionName)) continue;
-                            var bsonObject = db.GetCollection(collectionName).FindById(itemValue[prpInfo.Name].AsObjectId);
-                            if (bsonObject is null) continue;
-                            var nestedObject = BsonMapper.Global.Deserialize(prpInfo.PropertyType, bsonObject);
-
-                            // 🔥 RECURSION TIME
-                            nestedObject = ProcessTypeForDeserialization(nestedObject, bsonObject, db);
-
-                            prpInfo.SetValue(listItemObject, nestedObject);
-                            continue;
-                        }
-
-                        var tmpItemValue = itemValue[prpInfo.Name == "Id" ? "_id" : prpInfo.Name];
-
-                        var deserializedValue = BsonMapper.Global.Deserialize(prpInfo.PropertyType, tmpItemValue);
-
-                        // 🔥 If it's an object (not primitive) and has properties, recurse
-                        if (deserializedValue != null && tmpItemValue.IsDocument && !IsPrimitiveOrString(prpInfo.PropertyType))
-                        {
-                            deserializedValue = ProcessTypeForDeserialization(deserializedValue, tmpItemValue.AsDocument, db);
-                        }
-
-                        prpInfo.SetValue(listItemObject, deserializedValue);
-                    }
-
-                    underlyingList.Add(listItemObject);
-                }
-
-                return (true, underlyingList);
-            }
-
-            // This object derives from BaseLocalCacheModel so we need to set the value
             foreach (var itemValue in value.AsArray)
             {
-                var collectionName = propertyInfo!.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
-                var displayObject = db.GetCollection(collectionName).FindById(itemValue.ToString());
-                underlyingList.Add(displayObject);
+                var itemObject = Activator.CreateInstance(elementType);
+                foreach (var prpInfo in elementType.GetProperties())
+                {
+                    var tmpItemValue = itemValue[prpInfo.Name == "Id" ? "_id" : prpInfo.Name];
+                    var deserializedValue = BsonMapper.Global.Deserialize(prpInfo.PropertyType, tmpItemValue);
+
+                    if (deserializedValue != null && tmpItemValue.IsDocument && !IsPrimitiveOrString(prpInfo.PropertyType))
+                        deserializedValue = ProcessTypeForDeserialization(deserializedValue, tmpItemValue.AsDocument, db);
+
+                    prpInfo.SetValue(itemObject, deserializedValue);
+                }
+
+                addMethod.Invoke(underlyingCollection, new[] { itemObject });
             }
-            return (true, underlyingList);
 
-
+            return (true, underlyingCollection);
         }
+
+
+        //internal static (bool, Object?) ProcessCollectionTypeForDeserialization(string key, BsonValue value, Type itemType, LiteDB.LiteDatabase db)
+        //{
+        //    if (!value.IsArray) return (false, null);
+
+        //    var propertyInfo = itemType.GetProperty(key);
+
+        //    if (propertyInfo?.PropertyType is null || propertyInfo?.PropertyType?.GenericTypeArguments is null || propertyInfo?.PropertyType?.GenericTypeArguments.Count() == 0) return (false, null);
+
+        //    var listType = typeof(List<>).MakeGenericType(propertyInfo?.PropertyType?.GenericTypeArguments[0]!);
+        //    var underlyingList = (IList?)Activator.CreateInstance(listType);
+
+        //    if (underlyingList is null) return (false, null);
+
+        //    // If this object type doesn't derive from BaseLocalCacheModel then
+        //    // we need to set the value directly
+        //    var listItemType = propertyInfo?.PropertyType?.GenericTypeArguments[0]!;
+
+        //    if (listItemType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName == null)
+        //    {
+
+        //        foreach (var itemValue in value.AsArray)
+        //        {
+        //            var listItemObject = Activator.CreateInstance(listItemType);
+
+        //            foreach (var prpInfo in listItemType.GetProperties())
+        //            {
+
+                        
+        //                if (itemValue[prpInfo.Name].IsObjectId && prpInfo.PropertyType != typeof(ObjectId))
+        //                {
+        //                    var collectionName = prpInfo.PropertyType.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
+        //                    if (string.IsNullOrWhiteSpace(collectionName)) continue;
+        //                    var bsonObject = db.GetCollection(collectionName).FindById(itemValue[prpInfo.Name].AsObjectId);
+        //                    if (bsonObject is null) continue;
+        //                    var nestedObject = BsonMapper.Global.Deserialize(prpInfo.PropertyType, bsonObject);
+
+        //                    // 🔥 RECURSION TIME
+        //                    nestedObject = ProcessTypeForDeserialization(nestedObject, bsonObject, db);
+
+        //                    prpInfo.SetValue(listItemObject, nestedObject);
+        //                    continue;
+        //                }
+
+        //                var tmpItemValue = itemValue[prpInfo.Name == "Id" ? "_id" : prpInfo.Name];
+
+        //                var deserializedValue = BsonMapper.Global.Deserialize(prpInfo.PropertyType, tmpItemValue);
+
+        //                // 🔥 If it's an object (not primitive) and has properties, recurse
+        //                if (deserializedValue != null && tmpItemValue.IsDocument && !IsPrimitiveOrString(prpInfo.PropertyType))
+        //                {
+        //                    deserializedValue = ProcessTypeForDeserialization(deserializedValue, tmpItemValue.AsDocument, db);
+        //                }
+
+        //                prpInfo.SetValue(listItemObject, deserializedValue);
+        //            }
+
+        //            underlyingList.Add(listItemObject);
+        //        }
+
+        //        return (true, underlyingList);
+        //    }
+
+        //    // This object derives from BaseLocalCacheModel so we need to set the value
+        //    foreach (var itemValue in value.AsArray)
+        //    {
+        //        var collectionName = propertyInfo!.GetCustomAttribute<CollectionNameAttribute>()?.CollectionName;
+        //        var displayObject = db.GetCollection(collectionName).FindById(itemValue.ToString());
+        //        underlyingList.Add(displayObject);
+        //    }
+        //    return (true, underlyingList);
+
+
+        //}
 
         internal static (bool, object?) ProcessGenericTypeForDeserialization(string key, BsonValue value, Type itemType, LiteDB.LiteDatabase db)
         {
