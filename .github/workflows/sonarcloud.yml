@@ -24,9 +24,6 @@ jobs:
 
       - name: Install MAUI workloads
         run: dotnet workload install maui maui-android android --skip-sign-check          
-
-      - name: Restore workload packs
-        run: dotnet workload restore
           
       - uses: actions/checkout@v4
         with:
