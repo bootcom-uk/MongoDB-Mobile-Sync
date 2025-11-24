@@ -132,7 +132,7 @@ This trigger listens to changes in MongoDB collections and forwards inserts, upd
                 database: databaseName
             }, endpoint, bearerToken);
         }
-
+      
         // Handle document update
         if (changeEvent.operationType === "update") {
           let filteredDocument = {};
@@ -191,6 +191,7 @@ async function sendToWebAPI(payload, endpoint, bearerToken) {
         console.log(`Successfully notified endpoint ${endpoint} of ${JSON.stringify(payload)}.`);
     }
 }
+
 
 
 ```
