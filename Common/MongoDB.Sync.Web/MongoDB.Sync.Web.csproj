@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
 	  <PackageId>BootCom-MongoDB-Sync-Web</PackageId>
 	  <OutputType>Library</OutputType>
+		<IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
