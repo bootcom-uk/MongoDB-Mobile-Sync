@@ -33,6 +33,7 @@ namespace MongoDB.Sync.Web.Extensions
         }
     
 
+
         public static void MapSyncControllers(this IEndpointRouteBuilder app)
         {
             var dataSyncGroup = app.MapGroup("/api/DataSync");
