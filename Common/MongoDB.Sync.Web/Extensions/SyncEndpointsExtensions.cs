@@ -1,10 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Routing;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Web;
@@ -12,6 +7,7 @@ using MongoDB.Sync.Web.Helpers;
 using MongoDB.Sync.Web.Hubs;
 using MongoDB.Sync.Web.Interfaces;
 using MongoDB.Sync.Web.Models.SyncModels;
+using MongoDB.Sync.Web.Services;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -39,10 +35,10 @@ namespace MongoDB.Sync.Web.Extensions
 
         public static void MapSyncControllers(this IEndpointRouteBuilder app)
         {
-            var group = app.MapGroup("/api");
+            var dataSyncGroup = app.MapGroup("/api/DataSync");
 
             // 🔹 DataSyncController routes
-            group.MapPost("/live-update", async (
+            dataSyncGroup.MapPost("/live-update", async (
                 [FromServices] IHubContext<UpdateHub> hub,
                 [FromServices] ILoggerFactory loggerFactory,
                 [FromBody] PayloadModel payload) =>
@@ -55,7 +51,7 @@ namespace MongoDB.Sync.Web.Extensions
             .RequiresPermission("SERVICE_PERMISSION")
             .WithName("ReceiveLiveUpdate");
 
-            group.MapPost("/Send/{AppName}", async (
+            dataSyncGroup.MapPost("/Send/{AppName}", async (
                 [FromRoute] string appName,
                 [FromBody] LocalCacheDataChange localChange,
                 [FromServices] IAppSyncService syncService) =>
@@ -81,7 +77,7 @@ namespace MongoDB.Sync.Web.Extensions
             .RequireAuthorization()
             .WithName("SendDataToDatabase");
 
-            group.MapPost("/Collect", async (
+            dataSyncGroup.MapPost("/Collect", async (
                 [FromForm(Name = "AppName")] string appName,
                 [FromServices] IAppSyncService syncService) =>
             {
@@ -91,7 +87,7 @@ namespace MongoDB.Sync.Web.Extensions
             .RequireAuthorization()
             .WithName("GetAppInformation");
 
-            group.MapPost("/check-updates", async (
+            dataSyncGroup.MapPost("/check-updates", async (
                 [FromBody] WebSyncCollectionCheckRequest request,
                 [FromServices] IAppSyncService syncService,
                 ClaimsPrincipal user) =>
@@ -108,7 +104,7 @@ namespace MongoDB.Sync.Web.Extensions
             .RequireAuthorization()
             .WithName("CheckForCollectionUpdates");
 
-            group.MapPost("/sync", async (
+            dataSyncGroup.MapPost("/sync", async (
                 [FromForm(Name = "AppName")] string appName,
                 [FromForm(Name = "LastSyncDate")] DateTime? lastSyncDate,
                 [FromForm(Name = "LastSyncedId")] string? lastSyncedId,
@@ -143,8 +139,10 @@ namespace MongoDB.Sync.Web.Extensions
             .RequireAuthorization()
             .WithName("SyncData");
 
+            var initialSyncGroup = app.MapGroup("/api");
+
             // 🔹 InitialSyncController routes
-            group.MapGet("/initialsync", async (
+            initialSyncGroup.MapGet("/initialsync", async (
                 [FromServices] MongoDB.Sync.Web.Services.InitialSyncService service,
                 ClaimsPrincipal user) =>
             {
@@ -154,7 +152,7 @@ namespace MongoDB.Sync.Web.Extensions
             })
             .WithName("HasInitialSyncCompleted");
 
-            group.MapPost("/initialsync", async (
+            initialSyncGroup.MapPost("/initialsync", async (
                 [FromServices] MongoDB.Sync.Web.Services.InitialSyncService service,
                 ClaimsPrincipal user) =>
             {
@@ -164,6 +162,90 @@ namespace MongoDB.Sync.Web.Extensions
             })
             .RequireAuthorization("IsAdministrator")
             .WithName("PerformInitialSync");
+
+            // 🔹 AppController routes
+            var appGroup = app.MapGroup("/api/App");
+
+            appGroup.MapGet("/schema", async (
+        [FromServices] BsonSchemaService schemaService) =>
+            {
+                return Results.Ok(await schemaService.GetFullDatabaseSchemaAsync());
+            })
+    .RequiresPermission("ADMIN")
+    .WithName("GetSchema");
+
+            appGroup.MapGet("/all", async (
+                [FromServices] IAppSyncService appSyncService,
+                [FromServices] ILoggerFactory loggerFactory) =>
+            {
+                var logger = loggerFactory.CreateLogger("GetApps");
+                try
+                {
+                    var apps = await appSyncService.GetAppSyncMappings();
+                    return Results.Ok(apps);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error getting apps");
+                    return Results.BadRequest(ex);
+                }
+            })
+            .RequiresPermission("ADMIN")
+            .WithName("GetApps");
+
+            appGroup.MapPost("/", async (
+                [FromBody] AppSyncMapping appSyncMapping,
+                [FromServices] IAppSyncService appSyncService,
+                [FromServices] IHubContext<UpdateHub> hub,
+                [FromServices] InitialSyncService initialSyncService,
+                [FromServices] ILoggerFactory loggerFactory) =>
+            {
+                var logger = loggerFactory.CreateLogger("SaveApp");
+
+                try
+                {
+                    var newAppSyncMapping = await appSyncService.SaveAppSyncMapping(appSyncMapping);
+
+                    if (newAppSyncMapping != null)
+                    {
+                        await hub.Clients.Groups(appSyncMapping.AppId).SendAsync("AppSyncStarted");
+                        await initialSyncService.PerformInitialSync(appSyncMapping.AppName, appSyncMapping);
+                        await hub.Clients.Groups(appSyncMapping.AppId).SendAsync("AppSyncCompleted", newAppSyncMapping);
+                    }
+
+                    return Results.NoContent();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error saving the app sync mapping");
+                    return Results.BadRequest(ex);
+                }
+            })
+            .RequiresPermission("ADMIN")
+            .WithName("SaveApp");
+
+            appGroup.MapDelete("/{id}", async (
+                [FromRoute] string id,
+                [FromServices] IAppSyncService appSyncService,
+                [FromServices] ILoggerFactory loggerFactory) =>
+            {
+                var logger = loggerFactory.CreateLogger("DeleteApp");
+
+                try
+                {
+                    await appSyncService.DeleteAppSyncMapping(id);
+                    return Results.NoContent();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error deleting app");
+                    return Results.BadRequest(ex);
+                }
+            })
+            .RequiresPermission("ADMIN")
+            .WithName("DeleteApp");
+
         }
+        
     }
 }
