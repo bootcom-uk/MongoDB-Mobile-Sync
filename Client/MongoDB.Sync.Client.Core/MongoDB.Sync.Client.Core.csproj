@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MongoDB.Sync.Client.Interfaces\MongoDB.Sync.Client.Interfaces.csproj" />
+    <ProjectReference Include="..\MongoDB.Sync.Client.Models\MongoDB.Sync.Client.Models.csproj" />
+  </ItemGroup>
+
+</Project>

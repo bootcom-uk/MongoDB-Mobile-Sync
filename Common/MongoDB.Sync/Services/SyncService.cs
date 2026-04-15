@@ -375,9 +375,12 @@ namespace MongoDB.Sync.Services
             if (!response.Success) throw new Exception(response.Exception);
 
             var appSyncMapping = response.Result;
-            if (response.Headers?["ServerDateTime"] != null)
+
+            var serverDateTimeHeader = response.Headers?.FirstOrDefault(h => string.Equals(h.Key, "ServerDateTime", StringComparison.InvariantCultureIgnoreCase)).Value;
+
+            if (serverDateTimeHeader != null)
             {
-                appSyncMapping!.ServerDateTime = DateTime.Parse(response.Headers["ServerDateTime"]);
+                appSyncMapping!.ServerDateTime = DateTime.Parse(serverDateTimeHeader);
             }
             return appSyncMapping;
         }

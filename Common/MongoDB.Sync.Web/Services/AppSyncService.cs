@@ -115,7 +115,6 @@ namespace MongoDB.Sync.Web.Services
                 return null;
             }
 
-            //appMapping.LastChecked = DateTime.Now;
             return appMapping;
         }
 

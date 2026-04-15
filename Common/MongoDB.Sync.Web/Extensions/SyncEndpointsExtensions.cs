@@ -140,10 +140,10 @@ namespace MongoDB.Sync.Web.Extensions
             .RequireAuthorization()
             .WithName("SyncData");
 
-            var initialSyncGroup = app.MapGroup("/api");
+            var initialSyncGroup = app.MapGroup("/api/initialsync");
 
             // 🔹 InitialSyncController routes
-            initialSyncGroup.MapGet("/initialsync", async (
+            initialSyncGroup.MapGet("/", async (
                 [FromServices] MongoDB.Sync.Web.Services.InitialSyncService service,
                 ClaimsPrincipal user) =>
             {
@@ -153,7 +153,7 @@ namespace MongoDB.Sync.Web.Extensions
             })
             .WithName("HasInitialSyncCompleted");
 
-            initialSyncGroup.MapPost("/initialsync", async (
+            initialSyncGroup.MapPost("/", async (
                 [FromServices] MongoDB.Sync.Web.Services.InitialSyncService service,
                 ClaimsPrincipal user) =>
             {
