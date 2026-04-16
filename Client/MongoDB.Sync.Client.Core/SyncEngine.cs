@@ -43,7 +43,7 @@ namespace MongoDB.Sync.Client.Core
         public async Task ResumeSyncAsync()
         {
             foreach (var collection in _registry.GetAll())
-            {
+            {                
                 await SyncCollectionAsync(collection, fullSync: false);
             }
         }
@@ -61,31 +61,32 @@ namespace MongoDB.Sync.Client.Core
             int page = 1;
             const int pageSize = 500;
 
-            while (true)
-            {
-                var result = await _apiClient.GetCollectionPageAsync(
-                    _appName!,
-                    collection.CollectionName,
-                    lastUpdated,
-                    page,
-                    pageSize);
+            //while (true)
+            //{
+            //    var result = await _apiClient.GetCollectionPageAsync(
+            //        _appName!,
+            //        collection.DatabaseName,
+            //        collection.CollectionName,                    
+            //        lastUpdated,
+            //        page,
+            //        pageSize);
 
-                if (result.Items.Count == 0)
-                    break;
+            //    if (result.Items.Count == 0)
+            //        break;
 
-                await _localStore.UpsertAsync(
-                    collection.CollectionName,
-                    result.Items);
+            //    await _localStore.UpsertAsync(
+            //        collection.CollectionName,
+            //        result.Items);
 
-                if (result.MaxTimestamp != null)
-                {
-                    await _stateManager.SetLastUpdatedAsync(
-                        collection.CollectionName,
-                        result.MaxTimestamp.Value);
-                }
+            //    if (result.MaxTimestamp != null)
+            //    {
+            //        await _stateManager.SetLastUpdatedAsync(
+            //            collection.CollectionName,
+            //            result.MaxTimestamp.Value);
+            //    }
 
-                page++;
-            }
+            //    page++;
+            //}
         }
 
         public async Task StartRealtimeAsync()

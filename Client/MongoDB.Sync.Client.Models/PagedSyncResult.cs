@@ -13,5 +13,11 @@ namespace MongoDB.Sync.Client.Models
         public int Page { get; init; }
         public int PageSize { get; init; }
         public bool HasMore { get; init; }
+
+        public DateTime? LastSyncDate => throw new NotImplementedException();
+
+        public string? LastSyncedId => throw new NotImplementedException();
+
+        public int PageNumber => throw new NotImplementedException();
     }
 }

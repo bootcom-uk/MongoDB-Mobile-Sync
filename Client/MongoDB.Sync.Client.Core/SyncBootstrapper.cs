@@ -24,13 +24,13 @@ namespace MongoDB.Sync.Client.Core
             configureCollections?.Invoke(configurator);
 
             // 2. Configure engine
-            _syncEngine.Configure(appName, apiBaseUrl, localDbPath);
+            _syncEngine.Configure(appName, apiBaseUrl);
 
             // 3. Initial sync logic
-            if (!_stateManager.HasInitialSyncCompleted())
+            if (!await _stateManager.HasInitialSyncCompletedAsync())
             {
                 await _syncEngine.PerformInitialSyncAsync();
-                _stateManager.MarkInitialSyncComplete();
+                await _stateManager.MarkInitialSyncCompleteAsync();
             }
             else
             {

@@ -9,7 +9,7 @@ namespace MongoDB.Sync.Client.Core
     {
         private readonly Dictionary<string, SyncCollectionDefinition> _collections = new(StringComparer.OrdinalIgnoreCase);
 
-        public void Register(Type modelType, string collectionName)
+        public void Register(Type modelType, string collectionName, string databaseName)
         {
             if (string.IsNullOrWhiteSpace(collectionName))
                 throw new ArgumentException("Collection name cannot be empty.");
@@ -18,7 +18,7 @@ namespace MongoDB.Sync.Client.Core
                 throw new InvalidOperationException(
                     $"Collection '{collectionName}' is already registered.");
 
-            _collections[collectionName] = new SyncCollectionDefinition(modelType, collectionName);
+            _collections[collectionName] = new SyncCollectionDefinition(modelType, collectionName, databaseName);
         }
 
         public IReadOnlyCollection<SyncCollectionDefinition> GetAll() => _collections.Values.ToList().AsReadOnly();

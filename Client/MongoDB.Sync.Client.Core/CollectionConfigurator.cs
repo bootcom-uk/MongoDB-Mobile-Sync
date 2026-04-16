@@ -13,9 +13,9 @@ namespace MongoDB.Sync.Client.Core
             _registry = registry;
         }
 
-        public void AddCollection<T>(string collectionName)
+        public void AddCollection<T>(string collectionName, string databaseName)
         {
-            _registry.Register(typeof(T), collectionName);
+            _registry.Register(typeof(T), collectionName, databaseName);
         }
     }
 }
