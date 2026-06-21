@@ -11,6 +11,7 @@ using MongoDB.Sync.Models;
 using MongoDB.Sync.Models.Attributes;
 using Services;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -30,6 +31,8 @@ namespace MongoDB.Sync.Services
         private readonly Func<HttpRequestMessage, Task>? _statusChangeAction;
         private readonly IMessenger _messenger;
         private readonly BaseTypeResolverService _baseTypeResolverService;
+        private readonly ConcurrentQueue<SyncLocalCacheDataChange> _changesToProcess = new();
+        private readonly SemaphoreSlim _queueSignal = new(0);
 
         public bool SyncHasCompleted { get; set; } = false;
 
@@ -47,9 +50,24 @@ namespace MongoDB.Sync.Services
 
             InitializeReferenceResolvers();
 
-            Task.Run(ProcessQueue);
+            _ = ProcessQueueSafelyAsync();
         }
 
+        /// <summary>
+        /// Processes the queue of local cache data changes safely, catching any exceptions and logging them.
+        /// </summary>
+        /// <returns></returns>
+        private async Task ProcessQueueSafelyAsync()
+        {
+            try
+            {
+                await ProcessQueue();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Local cache queue processor crashed");
+            }
+        }
 
         private void InitializeReferenceResolvers()
         {
@@ -99,8 +117,6 @@ namespace MongoDB.Sync.Services
             return new LiveQueryableLiteCollection<T>(_messenger, _db, name, filter, secondaryFilter, order);
         }
 
-
-        private Queue<SyncLocalCacheDataChange> _changesToProcess = new();
 
         private async Task ProcessQueue()
         {
@@ -178,11 +194,17 @@ namespace MongoDB.Sync.Services
             if (collectionNameAttribute is null) throw new InvalidOperationException("CollectionNameAttribute is missing");
 
             // If a removal then clear from the local cache
-            if(localCacheDataChange.IsDeletion)
+            if (localCacheDataChange.IsDeletion)
             {
                 var primaryCollection = _db.GetCollection<BsonDocument>(localCacheDataChange.CollectionName);
                 primaryCollection.Delete(new ObjectId(localCacheDataChange.Id));
             }
+
+            var collection = _db.GetCollection<SyncLocalCacheDataChange>(collectionNameAttribute.CollectionName);
+
+            collection.Upsert(localCacheDataChange);
+            _changesToProcess.Enqueue(localCacheDataChange);
+            _queueSignal.Release();
 
             _messenger.Send(new DatabaseChangeMessage(new DatabaseChangeParameters()
             {
@@ -192,10 +214,7 @@ namespace MongoDB.Sync.Services
                 Id = new ObjectId(localCacheDataChange.Id)
             }));
 
-            var collection = _db.GetCollection<SyncLocalCacheDataChange>(collectionNameAttribute.CollectionName);   
-
-            collection.Upsert(localCacheDataChange);
-            _changesToProcess.Enqueue(localCacheDataChange);
+           
         }
 
         public void Save<T>(T item) where T : BaseLocalCacheModel
