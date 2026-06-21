@@ -149,8 +149,10 @@ namespace MongoDB.Sync.Services
                     await Task.Delay(TimeSpan.FromMilliseconds(500));
                     continue;
                 }
-                
-                var localCacheDataChange = _changesToProcess.Peek();
+
+                if (!_changesToProcess.TryDequeue(out var localCacheDataChange))
+                    continue;
+
                 if (localCacheDataChange.Document != null)
                 {
                     string jsonString = LiteDB.JsonSerializer.Serialize(localCacheDataChange.Document);
@@ -175,15 +177,15 @@ namespace MongoDB.Sync.Services
 
                 var response = await builder.SendAsync();
 
-                if (response.Success)
+                if (!response.Success)
                 {
-                    
-                    // Clear out from the local cache
-                    var recordsRemoved = collection.DeleteMany(record => record.InternalId == localCacheDataChange.InternalId && record.Id == localCacheDataChange.Id);
-
-                    // Successfully processed the change so remove it from the queue
-                    _changesToProcess.Dequeue();
+                    _changesToProcess.Enqueue(localCacheDataChange);
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                    continue;
                 }
+
+                // Clear out from the local cache
+                var recordsRemoved = collection.DeleteMany(record => record.InternalId == localCacheDataChange.InternalId && record.Id == localCacheDataChange.Id);
 
             }
         }
@@ -229,12 +231,12 @@ namespace MongoDB.Sync.Services
             var bson = BsonMapper.Global.Serialize(typeof(T), item).AsDocument;
             collection.Upsert(bson);
 
-            _messenger.Send(new DatabaseChangeMessage(new()
-            {
-                ChangedItem = bson,
-                CollectionName = attribute.CollectionName,
-                Id = idValue
-            }));
+            //_messenger.Send(new DatabaseChangeMessage(new()
+            //{
+            //    ChangedItem = bson,
+            //    CollectionName = attribute.CollectionName,
+            //    Id = idValue
+            //}));
 
             Enqueue(new SyncLocalCacheDataChange
             {
