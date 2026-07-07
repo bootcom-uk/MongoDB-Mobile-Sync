@@ -70,7 +70,7 @@ namespace MongoDB.Sync.Services
             if(_networkStateService.CurrentState != NetworkStateService.NetworkState.Connected)
             {
                 SyncIsStarting = true;
-                Console.WriteLine("⚠️ Cannot start sync: No network connection.");
+                Console.WriteLine(" Cannot start sync: No network connection.");
                 SyncIsStarting = false;
                 SyncHasCompleted = true;
                 _localCacheService.SyncHasCompleted = true;
