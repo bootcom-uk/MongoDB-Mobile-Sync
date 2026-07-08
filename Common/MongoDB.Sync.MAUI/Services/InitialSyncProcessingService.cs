@@ -18,6 +18,10 @@ namespace MongoDB.Sync.MAUI.Services
         public InitialSyncProcessingService(IMessenger messenger) { 
             _messenger = messenger;
 
+            _messenger.Register<APISyncStartedMessage>(this, (r, m) => {                
+                IsRunning = true;
+            });
+
             _messenger.Register<APISyncProcessingMessage>(this, (r, m) => {
                 // Handle the message here
             });

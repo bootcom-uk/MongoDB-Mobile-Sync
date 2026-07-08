@@ -311,16 +311,19 @@ namespace MongoDB.Sync.Web.Services
         }
 
 
-
-        public async Task<SyncResult> SyncAppDataAsync(
-    string appName,
-    string userId,
-    string databaseName,
-    string collectionName,
-    bool isInitialSync = false,
-    int pageNumber = 1,
-    string? lastSyncedId = null,
-    DateTime? lastSyncDate = null)
+        /// <summary>
+        /// Syncs data for a specific app, user, database, and collection. Supports both initial sync and incremental sync based on the last synced ID or date.
+        /// </summary>
+        /// <param name="appName"></param>
+        /// <param name="userId"></param>
+        /// <param name="databaseName"></param>
+        /// <param name="collectionName"></param>
+        /// <param name="isInitialSync"></param>
+        /// <param name="pageNumber"></param>
+        /// <param name="lastSyncedId"></param>
+        /// <param name="lastSyncDate"></param>
+        /// <returns></returns>
+        public async Task<SyncResult> SyncAppDataAsync(string appName, string userId, string databaseName, string collectionName, bool isInitialSync = false, int pageNumber = 1, string? lastSyncedId = null, DateTime? lastSyncDate = null)
         {
             var appCollection = _appServicesDb.GetCollection<AppSyncMapping>("SyncMappings");
             var appMapping = await appCollection.Find(a => a.AppName == appName).FirstOrDefaultAsync();

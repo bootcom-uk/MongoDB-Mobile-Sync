@@ -218,6 +218,8 @@ namespace MongoDB.Sync.Services
 
             await Task.WhenAll(syncTasks);
 
+            _messenger.Send<APISyncCompletedMessage>(new APISyncCompletedMessage(true));
+
             // Step 7: Mark initial sync as complete
             _localDatabaseService.InitialSyncComplete();
         }
@@ -269,6 +271,15 @@ namespace MongoDB.Sync.Services
 
                     _messenger.Send(new APISyncMessageReceived(JsonSerializer.Serialize(updatedData)));
                 }
+
+                _messenger.Send(new APISyncProcessingMessage(new APISyncProcessingDetail()
+                {
+                    
+                    DatabaseName = item.DatabaseName,
+                    CollectionName = item.CollectionName,
+                    PageNumber = pageNumber,
+                    RecordsProcessed = response.Result.Data.Count
+                }));
 
                 pageNumber++;
             }
