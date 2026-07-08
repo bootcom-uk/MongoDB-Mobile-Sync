@@ -21,8 +21,8 @@
 
 	<ItemGroup>
 		<PackageReference Include="BootCom-Maui-Shared-Services" Version="1.3.37" />
-		<PackageReference Include="BootCom-MongoDB-Sync" Version="1.2.51" />
-		<PackageReference Include="BootCom-MongoDB-Sync-Core-Services-Models" Version="1.2.51" />
+		<PackageReference Include="BootCom-MongoDB-Sync" Version="1.2.52" />
+		<PackageReference Include="BootCom-MongoDB-Sync-Core-Services-Models" Version="1.2.52" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 		<PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.80" />

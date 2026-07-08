@@ -14,7 +14,7 @@ using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace MongoDB.Sync.Services
 {
-    public class SyncService : ObservableObject, ISyncService
+    public partial class SyncService : ObservableObject, ISyncService
     {
         private readonly string _apiUrl;
         private readonly string _appName;
@@ -27,11 +27,16 @@ namespace MongoDB.Sync.Services
         public readonly LocalDatabaseSyncService _localDatabaseService;
         private readonly LocalCacheService _localCacheService;
 
-        public bool SyncIsStarting { get; set; } = false;
-        public bool SyncHasCompleted { get; set; } = false;
+        [ObservableProperty]
+        bool syncIsStarting  = false;
+
+        [ObservableProperty]
+        bool syncHasCompleted = false;
 
         private AppSyncMapping? _appDetails;
-        public bool AppSyncInProgress { get; set; } = false;
+
+        [ObservableProperty]    
+        bool appSyncInProgress = false;
 
         private JsonSerializerOptions _serializationOptions = new()
         {
@@ -61,16 +66,17 @@ namespace MongoDB.Sync.Services
             });
         }
 
-
-
-         public async Task StartSyncAsync()
+        /// <summary>
+        /// Starts the synchronization process. This method checks if synchronization has already completed or is currently starting. If not, it verifies the network connection state. If connected, it performs an API synchronization to ensure local data is up-to-date with the server, and then establishes a SignalR connection for real-time updates. The method sets flags to indicate the synchronization state and updates the local cache service accordingly.
+        /// </summary>
+        /// <returns></returns>
+        public async Task StartSyncAsync()
         {
             if (SyncHasCompleted || SyncIsStarting) return;
             
             if(_networkStateService.CurrentState != NetworkStateService.NetworkState.Connected)
             {
                 SyncIsStarting = true;
-                Console.WriteLine(" Cannot start sync: No network connection.");
                 SyncIsStarting = false;
                 SyncHasCompleted = true;
                 _localCacheService.SyncHasCompleted = true;
@@ -88,6 +94,10 @@ namespace MongoDB.Sync.Services
             _localCacheService.SyncHasCompleted = true;
         }
 
+        /// <summary>
+        /// Stops the synchronization process if it has completed. This method checks if the synchronization has completed and if the SignalR hub connection is active. If both conditions are met, it stops the SignalR connection, effectively halting any real-time updates and synchronization activities. This is useful for scenarios where you want to temporarily stop receiving updates or when shutting down the application.
+        /// </summary>
+        /// <returns></returns>
         public async Task StopSyncAsync()
         {
             if (!SyncHasCompleted) return;
@@ -100,6 +110,10 @@ namespace MongoDB.Sync.Services
 
         public async Task ResumeSyncAsync() => await StartSyncAsync();
 
+        /// <summary>
+        /// Clears the local cache and stops any ongoing synchronization processes. This method first stops the synchronization process if it is currently running, and then sends a message to clear the local cache. It is useful for resetting the local state of the application, especially when there are issues with data consistency or when a fresh start is needed.
+        /// </summary>
+        /// <returns></returns>
         public async Task ClearCacheAsync()
         {
             await StopSyncAsync();
@@ -108,10 +122,13 @@ namespace MongoDB.Sync.Services
 
         private async Task PerformAPISync()
         {
+
             // Step 1: Get server-side app mapping
             var serverAppInfo = await GetAppInformation();
             if (serverAppInfo is null)
                 throw new Exception("Failed to get remote app mapping.");
+
+            _messenger.Send<APISyncStartedMessage>(new APISyncStartedMessage(true));
 
             _messenger.Send(new InitializeLocalDataMappingMessage(serverAppInfo));
 

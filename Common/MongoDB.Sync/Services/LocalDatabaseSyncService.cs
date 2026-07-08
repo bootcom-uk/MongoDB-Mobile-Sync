@@ -58,12 +58,21 @@ namespace MongoDB.Sync.Services
             LiteDb.DropCollection(collectionName);
         }
 
+        /// <summary>
+        /// Retrieves the application mapping for the current application name from the local LiteDB database. This method queries the "AppMappings" collection to find a record that matches the specified application name. If a matching record is found, it returns the corresponding AppSyncMapping object; otherwise, it returns null.
+        /// </summary>
+        /// <returns></returns>
         public AppSyncMapping GetAppMapping()
         {
             var appsCollection = LiteDb.GetCollection<AppSyncMapping>("AppMappings");
             return appsCollection.FindOne(x => x.AppName == _appName);
         }
 
+        /// <summary>
+        /// Handles the initialization of local data mappings. This method checks if the provided mapping exists in the local database. If it doesn't exist, it inserts the new mapping. If it does exist, it checks for version differences and updates the local database accordingly. Additionally, it checks if a full refresh is needed based on the last sync time and clears the local cache if necessary.
+        /// </summary>
+        /// <param name="recipient"></param>
+        /// <param name="message"></param>
         private void HandleLocalDataMappings(object recipient, InitializeLocalDataMappingMessage message)
         {
             var mapping = message.Value;
@@ -123,6 +132,12 @@ namespace MongoDB.Sync.Services
 
         }
 
+        /// <summary>
+        /// Retrieves the last synchronization date and time for a specific database and collection from the local LiteDB database. This method queries the specified collection for the most recent document based on the "__meta.dateUpdated" field. If a document is found and contains a valid date, it returns that date; otherwise, it returns null.
+        /// </summary>
+        /// <param name="databaseName"></param>
+        /// <param name="collectionName"></param>
+        /// <returns></returns>
         public DateTime? GetLastSyncDateTime(string databaseName, string collectionName)
         {
             try
@@ -149,6 +164,12 @@ namespace MongoDB.Sync.Services
             return null;
         }
 
+        /// <summary>
+        /// Retrieves the last synchronized ObjectId for a specific database and collection from the local LiteDB database. This method queries the "AppMappings" collection to find the application record for the current application name, then searches for the specified database and collection within that record. If a matching collection is found, it returns the last synchronized ObjectId; otherwise, it returns null.
+        /// </summary>
+        /// <param name="databaseName"></param>
+        /// <param name="collectionName"></param>
+        /// <returns></returns>
         public ObjectId? GetLastId(string databaseName, string collectionName)
         {
             var appsCollection = LiteDb.GetCollection<AppSyncMapping>("AppMappings");
@@ -158,6 +179,9 @@ namespace MongoDB.Sync.Services
             return collectionToModify.LastId;
         }
 
+        /// <summary>
+        /// Marks the initial synchronization process as complete for the current application in the local LiteDB database. This method updates the "InitialSyncComplete" property of the application record in the "AppMappings" collection to true, indicating that the initial synchronization has been successfully completed.
+        /// </summary>
         public void InitialSyncComplete()
         {
             var appsCollection = LiteDb.GetCollection<AppSyncMapping>("AppMappings");
@@ -166,6 +190,12 @@ namespace MongoDB.Sync.Services
             appsCollection.Update(appRecord);
         }
 
+        /// <summary>
+        /// Sets the last synchronized ObjectId for a specific database and collection in the local LiteDB database. This method updates the "LastId" property of the specified collection within the application record in the "AppMappings" collection, allowing the system to track the most recent synchronized document for that collection.
+        /// </summary>
+        /// <param name="databaseName"></param>
+        /// <param name="collectionName"></param>
+        /// <param name="id"></param>
         private void SetLastId(string databaseName, string collectionName, ObjectId id)
         {
             var appsCollection = LiteDb.GetCollection<AppSyncMapping>("AppMappings");
@@ -176,6 +206,11 @@ namespace MongoDB.Sync.Services
             appsCollection.Update(appRecord);
         }
 
+        /// <summary>
+        /// Handles the reception of an API synchronization message. This method processes the received message, deserializes the updated data, and updates the local LiteDB database accordingly. It checks if the document is marked as deleted and either deletes or upserts the document in the appropriate collection. Additionally, it sends a DatabaseChangeMessage to notify other components of the change and updates the last synchronized ObjectId for the collection.
+        /// </summary>
+        /// <param name="recipient"></param>
+        /// <param name="message"></param>
         private void HandleAPISyncMessageReceived(object recipient, APISyncMessageReceived message)
         {
             _liteDbQueueProcessor.Enqueue(async db =>
@@ -219,7 +254,11 @@ namespace MongoDB.Sync.Services
             });
         }
 
-
+        /// <summary>
+        /// Handles the reception of a real-time update message. This method processes the received message, deserializes the payload, and updates the local LiteDB database accordingly. It checks the action specified in the payload (insert, update, or delete) and performs the corresponding operation on the appropriate collection. Additionally, it sends a DatabaseChangeMessage to notify other components of the change.
+        /// </summary>
+        /// <param name="recipient"></param>
+        /// <param name="message"></param>
         private void HandleRealtimeUpdate(object recipient, RealtimeUpdateReceivedMessage message)
         {
             try
@@ -307,9 +346,6 @@ namespace MongoDB.Sync.Services
                 Console.WriteLine(ex.ToString());
             }
         }
-
-
-
 
     }
 }

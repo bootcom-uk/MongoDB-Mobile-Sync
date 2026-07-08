@@ -1,7 +1,4 @@
 ﻿using MongoDB.Sync.Client.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace MongoDB.Sync.Client.Core
 {
@@ -15,8 +12,7 @@ namespace MongoDB.Sync.Client.Core
                 throw new ArgumentException("Collection name cannot be empty.");
 
             if (_collections.ContainsKey(collectionName))
-                throw new InvalidOperationException(
-                    $"Collection '{collectionName}' is already registered.");
+                throw new InvalidOperationException($"Collection '{collectionName}' is already registered.");
 
             _collections[collectionName] = new SyncCollectionDefinition(modelType, collectionName, databaseName);
         }

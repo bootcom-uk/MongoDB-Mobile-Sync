@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
+using MongoDB.Sync.Messages;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -17,7 +18,7 @@ namespace MongoDB.Sync.MAUI.Services
         public InitialSyncProcessingService(IMessenger messenger) { 
             _messenger = messenger;
 
-            //_messenger.Register<APISyncProcessingMessage>
+            _messenger.Register<APISyncProcessingMessage>()
         }
 
         
