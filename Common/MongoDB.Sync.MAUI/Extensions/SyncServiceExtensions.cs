@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using MongoDB.Sync.Core.Services.Models.Services;
 using MongoDB.Sync.Interfaces;
 using MongoDB.Sync.MAUI.Models;
+using MongoDB.Sync.MAUI.Services;
 using MongoDB.Sync.Services;
 using Services;
 
@@ -66,6 +67,8 @@ namespace MongoDB.Sync.MAUI.Extensions
 
                return new LocalCacheService(messenger, localDatabaseSyncService, logger, httpService, options.ApiUrl, options.AppName, options.PreRequestAction, options.StatusChangeAction, baseTypeResolverService);
             });
+
+            builder.Services.AddSingleton<InitialSyncProcessingService>();
 
             return builder;
         }

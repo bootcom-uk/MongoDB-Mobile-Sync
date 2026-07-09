@@ -13,6 +13,9 @@ namespace MongoDB.Sync.MAUI.Services
         [ObservableProperty]
         bool isRunning = false;
 
+        [ObservableProperty]
+        string processingMessage = string.Empty;
+
         private readonly IMessenger _messenger;
 
         public InitialSyncProcessingService(IMessenger messenger) { 
@@ -23,7 +26,13 @@ namespace MongoDB.Sync.MAUI.Services
             });
 
             _messenger.Register<APISyncProcessingMessage>(this, (r, m) => {
-                // Handle the message here
+                processingMessage = $"Processing page: {m.Value.PageNumber} for {m.Value.DatabaseName}_{m.Value.CollectionName}";
+            });
+
+            _messenger.Register<APISyncCompletedMessage>(this, (r, m) =>
+            {
+                processingMessage = "Sync Complete";
+                IsRunning = false;
             });
         }
 
