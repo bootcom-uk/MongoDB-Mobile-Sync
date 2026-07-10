@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BootCom-MongoDB-Sync-Models" Version="1.2.55" />
+    <PackageReference Include="BootCom-MongoDB-Sync-Models" Version="1.2.56" />
     <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="10.0.9" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.3.11" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Abstractions" Version="2.3.11" />
