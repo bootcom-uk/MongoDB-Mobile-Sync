@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BootCom-MongoDB-Sync-Models" Version="1.2.56" />
+    <PackageReference Include="BootCom-MongoDB-Sync-Models" Version="1.2.58" />
     <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="10.0.9" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.3.11" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Abstractions" Version="2.3.11" />
@@ -20,7 +20,7 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <PackageReference Include="MongoDB.Bson" Version="3.10.0" />
     <PackageReference Include="MongoDB.Driver" Version="3.10.0" />
-    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.7.2" />
+    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.7.3" />
   </ItemGroup>
 
 
