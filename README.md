@@ -59,6 +59,20 @@ This trigger listens to changes in MongoDB collections and forwards inserts, upd
             continue;
         }
 
+        // Filtered collections are reconciled from the source by the authenticated API.
+        // Notify on EVERY source change, including changes to fields omitted from projection.
+        // Do not put private record bodies or identifiers in this notification.
+        if (typeof matchingCollection.filter === "string" && matchingCollection.filter.trim()) {
+            await sendToWebAPI({
+                action: "invalidate",
+                collection: collectionName,
+                database: databaseName,
+                appId: appName,
+                document: {}
+            }, endpoint, bearerToken);
+            continue;
+        }
+
         // Handle document insertion
         if (changeEvent.operationType === "insert") {
             let insertedDocument = {};
