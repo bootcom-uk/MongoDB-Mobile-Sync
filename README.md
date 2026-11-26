@@ -18,182 +18,111 @@ This trigger listens to changes in MongoDB collections and forwards inserts, upd
 
   **Where you don't have an authentication mechanism which requires a bearer token, you will need to modify that line in the trigger**
 
+Before enabling filters, deploy the matching API and device changes. Configure this trigger for **Insert, Update, Replace and Delete**, enable **Full Document**, and preserve event ordering. Watch the source collections, not the derived AppServices cache. Replace `<<ENTER CLUSTER NAME HERE>>` with your linked MongoDB service name before deploying.
+
+The copyable source is [triggers/sync-source.js](triggers/sync-source.js). Filtered collections send only invalidations and are read through the authenticated API. Unfiltered collections use replay-safe replacement upserts, retain source IDs and remove deleted fields from the server cache. Legacy live clients receive null for missing selected top-level fields because their handlers merge updates; a later HTTP refresh removes those keys. Nested selection paths are not interpreted by this projection.
+
+HTTP failures or missing full documents fail the invocation after other applications are attempted. Monitor failures and use the configured operational recovery procedure; this code does not promise automatic HTTP retries. Do not enable filters until updated clients handle invalidations.
+
 <details>
   <summary>
   Click to expand / view trigger code
   </summary>
 
-``` json
-    exports = async function (changeEvent) {
-    const currentClusterName = "<<YOUR CLUSTER NAME HERE>>";
-    const db = context.services.get(currentClusterName).db("AppServices");
-    const appCollection = db.collection("SyncMappings");
+```javascript
+/// <summary>Projects source changes into public caches or invalidates private collections.</summary>
+exports = async function (changeEvent) {
+    const currentClusterName = "<<ENTER CLUSTER NAME HERE>>";
+    const operation = changeEvent.operationType;
+    if (!["insert", "update", "replace", "delete"].includes(operation)) return;
 
-    const fullDocument = changeEvent.fullDocument;
-    const updatedFields = changeEvent.updateDescription ? changeEvent.updateDescription.updatedFields : null;
-    const collectionName = changeEvent.ns.coll;
-    const databaseName = changeEvent.ns.db; // Get the database name from the change event
-
-    // Retrieve all apps that include the current databaseName and collectionName
-    const apps = await appCollection.find({
-        "collections.databaseName": databaseName,
-        "collections.collectionName": collectionName
+    const database = changeEvent.ns.db;
+    const collection = changeEvent.ns.coll;
+    const service = context.services.get(currentClusterName);
+    const cache = service.db("AppServices");
+    const apps = await cache.collection("SyncMappings").find({
+        collections: { $elemMatch: { databaseName: database, collectionName: collection } }
     }).toArray();
-
-    if (apps.length === 0) {
-        console.log(`No apps found with database: ${databaseName} and collection: ${collectionName}`);
-        return;
-    }
+    let failures = 0;
 
     for (const app of apps) {
-        const appId = app.appId;
-        const appName = app.appName;
-        let collectionToUpdate = appId + "_" + collectionName;
+        try {
+            const mapping = app.collections.find(c =>
+                c.databaseName === database && c.collectionName === collection);
+            if (!mapping) continue;
+            if (!app.appId || !app.appName || !app.endpoint || !app.bearerToken)
+                throw new Error("Incomplete application configuration.");
 
-        const matchingCollection = app.collections.find(c => c.databaseName === databaseName && c.collectionName === collectionName);
-        const endpoint = app.endpoint;  // Get the endpoint from SyncMappings
-        const bearerToken = app.bearerToken; // Get the Bearer token from the app document
-
-        if (!matchingCollection) {
-            console.log(`No collection mapping found for appId: ${appId}, database: ${databaseName}, and collection: ${collectionName}`);
-            continue;
-        }
-
-        // Handle document insertion
-        if (changeEvent.operationType === "insert") {
-            let insertedDocument = {};
-            matchingCollection.fields.forEach(field => {
-                if (fullDocument[field] !== undefined) {
-                    insertedDocument[field] = fullDocument[field];
-                }
-            });
-
-            if (Object.keys(insertedDocument).length > 0) {
-                insertedDocument["__meta"] = { "dateUpdated": new Date() };
-
-                await context.services.get(currentClusterName).db("AppServices").collection(collectionToUpdate).insertOne(insertedDocument);
-
-                // Send data to the app's endpoint
-                await sendToWebAPI({
-                    action: "insert",
-                    collection: collectionName,
-                    document: insertedDocument,
-                    appId: appName,
-                    database: databaseName
-                }, endpoint, bearerToken);
+            const payload = { appId: app.appName, database, collection };
+            // A corrupt policy must never fall back to broadcasting private records.
+            if (mapping.filter != null && typeof mapping.filter !== "string")
+                throw new Error("Invalid filter configuration.");
+            if (typeof mapping.filter === "string" && mapping.filter.trim()) {
+                await sendToWebAPI({ ...payload, action: "invalidate", document: {} }, app);
+                continue;
             }
+
+            const id = changeEvent.documentKey && changeEvent.documentKey._id;
+            if (id == null) throw new Error("Missing source document ID.");
+            const target = cache.collection(app.appId + "_" + collection);
+            const document = { _id: id, __meta: { dateUpdated: new Date() } };
+
+            if (operation === "delete") {
+                document.__meta.deleted = true;
+                // Replace the body with a tombstone; do not retain deleted private values.
+                await target.replaceOne({ _id: id }, document, { upsert: true });
+                await sendToWebAPI({ ...payload, action: "delete", document }, app);
+                continue;
+            }
+
+            if (!changeEvent.fullDocument)
+                throw new Error("Missing full document; enable Full Document on the trigger.");
+            if (!Array.isArray(mapping.fields)) throw new Error("Invalid field configuration.");
+
+            for (const field of mapping.fields) {
+                if (field === "_id" || field === "__meta") continue;
+                if (Object.prototype.hasOwnProperty.call(changeEvent.fullDocument, field))
+                    document[field] = changeEvent.fullDocument[field];
+            }
+
+            // Replay-safe upsert, including inserts; removed source fields leave the cache.
+            await target.replaceOne({ _id: id }, document, { upsert: true });
+
+            // Legacy device handlers merge updates. Clear missing selected fields explicitly.
+            // They remain null locally until a subsequent HTTP refresh replaces the row.
+            const liveDocument = { ...document };
+            for (const field of mapping.fields) {
+                if (field !== "_id" && field !== "__meta" &&
+                    !Object.prototype.hasOwnProperty.call(document, field))
+                    liveDocument[field] = null;
+            }
+            await sendToWebAPI({ ...payload,
+                action: operation === "insert" ? "insert" : "update",
+                document: liveDocument
+            }, app);
+        } catch (_) {
+            // Try the other applications; never log record bodies, tokens or response bodies.
+            failures++;
         }
-
-        // Handle document deletion
-        if (changeEvent.operationType === "delete") {
-            let filteredDocument = {};
-            filteredDocument["__meta"] = { "dateUpdated": new Date(), "deleted": true };
-
-            await context.services.get(currentClusterName).db("AppServices").collection(collectionToUpdate).updateOne(
-                { _id: changeEvent.documentKey._id },
-                { $set: filteredDocument },
-                { upsert: true }
-            );
-
-            // Notify the app's endpoint about deletion
-            await sendToWebAPI({
-                action: "delete",
-                collection: collectionName,
-                document: { _id: changeEvent.documentKey._id, deleted: true },
-                appId: appName,
-                database: databaseName
-            }, endpoint, bearerToken);
-        }
-
-        // Handle document replace (full document replacement)
-        if (changeEvent.operationType === "replace") {
-            let replacedDocument = {};
-            matchingCollection.fields.forEach(field => {
-                if (fullDocument[field] !== undefined) {
-                    replacedDocument[field] = fullDocument[field];
-                }
-            });
-        
-            replacedDocument["_id"] = fullDocument._id;
-            replacedDocument["__meta"] = { "dateUpdated": new Date() };
-        
-            await context.services.get(currentClusterName).db("AppServices").collection(collectionToUpdate).updateOne(
-                { _id: fullDocument._id },
-                { $set: replacedDocument },
-                { upsert: true }
-            );
-        
-            // Send replaced data to the app's endpoint
-            await sendToWebAPI({
-                action: "replace",
-                collection: collectionName,
-                document: replacedDocument,
-                appId: appName,
-                database: databaseName
-            }, endpoint, bearerToken);
-        }
-      
-        // Handle document update
-        if (changeEvent.operationType === "update") {
-          let filteredDocument = {};
-
-          matchingCollection.fields.forEach(field => {
-                if (fullDocument[field] !== undefined) {
-                    filteredDocument[field] = fullDocument[field];
-                }
-            });
-      
-          // Always include _id
-          filteredDocument["_id"] = fullDocument._id;
-          filteredDocument["__meta"] = { "dateUpdated": new Date() };
-      
-          if (Object.keys(filteredDocument).length <= 2) { // _id and __meta don't count
-              console.log(`No relevant fields were updated for appId: ${appId}, database: ${databaseName}, and collection: ${collectionToUpdate}`);
-              continue;
-          }
-      
-          await context.services.get(currentClusterName).db("AppServices").collection(collectionToUpdate).updateOne(
-              { _id: fullDocument._id },
-              { $set: filteredDocument },
-              { upsert: true }
-          );
-      
-          await sendToWebAPI({
-              action: "update",
-              collection: collectionName,
-              document: filteredDocument,
-              appId: appName,
-              database: databaseName
-          }, endpoint, bearerToken);
-      }
     }
+
+    if (failures > 0)
+        throw new Error(`Synchronization failed for ${failures} application(s). Check trigger configuration and API availability.`);
 };
 
-// Helper function to send HTTP POST request to the app's endpoint with Bearer Token
-async function sendToWebAPI(payload, endpoint, bearerToken) {
-    if (!endpoint || !bearerToken) {
-        console.log(`Missing endpoint or Bearer token for payload: ${JSON.stringify(payload)}`);
-        return;
-    }
-
+/// <summary>Sends typed JSON and rejects failed notifications without disclosing payloads.</summary>
+async function sendToWebAPI(payload, app) {
     const response = await context.http.post({
-        url: endpoint,
+        url: app.endpoint,
         headers: {
             "Content-Type": ["application/json"],
-            "Authorization": [`Bearer ${bearerToken}`] // Include Bearer Token in Authorization header
+            "Authorization": [`Bearer ${app.bearerToken}`]
         },
-        body: EJSON.stringify(payload, { relaxed: false }) // Preserve types
+        body: EJSON.stringify(payload, { relaxed: false })
     });
-
-    if (response.statusCode < 200 || response.statusCode > 299) {
-        console.log(`Failed to notify endpoint ${endpoint}. Status code: ${response.statusCode}. Content: ${JSON.stringify(payload)}`);
-    } else {
-        console.log(`Successfully notified endpoint ${endpoint} of ${JSON.stringify(payload)}.`);
-    }
+    if (!response || response.statusCode < 200 || response.statusCode > 299)
+        throw new Error("Sync API rejected the notification.");
 }
-
-
-
 ```
 </details>
 
